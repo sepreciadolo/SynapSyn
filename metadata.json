@@ -1,0 +1,6 @@
+{
+  "name": "NeuroCompendio",
+  "description": "Compendio clínico de Neurología para médicos en formación. Incluye escalas clínicas (NIHSS, ALSFRS-R, QMG, DRAGON), criterios diagnósticos (Gold Coast, EULAR/ACR 2017) y clasificación de epilepsia (ILAE) con copiado estructurado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
