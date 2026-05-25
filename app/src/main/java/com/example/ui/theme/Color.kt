@@ -11,7 +11,7 @@ val LightError = Color(0xFFB42318)
 
 // Dark Theme colors
 val DarkBg = Color(0xFF000000)
-val DarkSurface = Color(0xFF121212)
+val DarkSurface = Color(0xFF000000)
 val DarkPrimary = Color(0xFF7DB7FF)
 val DarkSecondary = Color(0xFF5EEAD4)
 val DarkError = Color(0xFFFDA29B)

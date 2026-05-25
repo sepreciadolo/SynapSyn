@@ -44,6 +44,20 @@ data class DiagnosticSubclass(
     val clinicalPoints: List<String> = emptyList()
 )
 
+data class DermatomeReference(
+    val level: String,
+    val landmark: String,
+    val description: String
+)
+
+data class ReflexReference(
+    val name: String,
+    val level: String,
+    val nerve: String,
+    val response: String,
+    val clinicalNotes: String
+)
+
 object ClinicalDatabase {
     // 1. Scales definitions and content
     val nihss = ScaleMetadata(
@@ -517,7 +531,7 @@ object ClinicalDatabase {
         val dosage: String,
         val sideEffects: String,
         val clinicalNotes: String,
-        val category: String = "Inmunomoduladores / Reperfusión"
+        val category: String = "Reperfusión y Antiagregantes"
     )
 
     val drugs = listOf(
@@ -861,7 +875,7 @@ object ClinicalDatabase {
             dosage = "Dosis total: 0.9 mg/kg (dosis máxima absoluta 90 mg). Administración: 10% de la dosis total administrada como bolo intravenoso directo en 1 minuto, seguido por el 90% restante en infusión continua endovenosa durante 60 minutos.",
             sideEffects = "Hemorragia intracerebral sintomática (rango de riesgo de 6%), sangrado sistémico activo, angioedema orolingual (especialmente en combinación de IECA).",
             clinicalNotes = "Monitorear estrictamente la presión arterial (mantener TA < 180/105 mmHg). Descartar sangrado activo en TAC craneal previo a su administración. Vigilar escalas de exclusión.",
-            category = "Inmunomoduladores / Reperfusión"
+            category = "Reperfusión y Antiagregantes"
         ),
         DrugReference(
             name = "Tenecteplasa (TNK-tPA)",
@@ -870,7 +884,34 @@ object ClinicalDatabase {
             dosage = "Dosis estándar: 0.25 mg/kg por vía intravenosa en un bolo único de 5-10 segundos (dosis máxima 25 mg). En escenarios raros se evalúa dosis de 0.4 mg/kg.",
             sideEffects = "Riesgo similar o ligeramente inferior de hemorragia intracerebral comparado con alteplasa, sangrado menor de encías y accesos de punción.",
             clinicalNotes = "Facilidad de administración inmediata por bolo directo, acelerando tiempos 'puerta-aguja'. Contraindicaciones idénticas a la alteplasa.",
-            category = "Inmunomoduladores / Reperfusión"
+            category = "Reperfusión y Antiagregantes"
+        ),
+        DrugReference(
+            name = "Ácido Acetilsalicílico (Aspirina)",
+            acronym = "AAS / ASA",
+            indications = "Prevención secundaria de ACV isquémico no cardioembólico de origen aterotrombótico o lacunar. Fase aguda del infarto cerebral isquémico dentro de las primeras 24-48 horas de evolución (fuera de ventana de trombólisis o transcurridas 24 horas tras rTPA).",
+            dosage = "Fase aguda: 160 mg a 325 mg por vía oral (VO) una vez al día. Prevención secundaria a largo plazo: 81 mg a 100 mg VO al día. En DAPT (terapia antiplaquetaria dual) usualmente se asocia a Clopidogrel por un periodo corto.",
+            sideEffects = "Dispepsia, pirosis, gastritis, erosión y sangrado latente de la mucosa gastrointestinal, úlceras pépticas, sangrado de encías, epistaxis, reacciones de hipersensibilidad.",
+            clinicalNotes = "Inhibidor irreversible de la ciclooxigenasa-1 (COX-1) bloqueando la síntesis de tromboxano A2. Evitar estrictamente su administración antes de que transcurran 24 horas exactas de la infusión de rTPA. El uso concomitante de un inhibidor de bomba de protones (IBP) disminuye el riesgo de sangrados digestivos.",
+            category = "Reperfusión y Antiagregantes"
+        ),
+        DrugReference(
+            name = "Clopidogrel",
+            acronym = "CLO",
+            indications = "Prevención secundaria en ACV isquémico no cardioembólico (intolerancia a aspirina/alergia) o en terapia antiplaquetaria dual combinada (DAPT) para ACV isquémico menor agudo (NIHSS ≤3) o AIT de alto riesgo (ABCD² ≥4).",
+            dosage = "Monoterapia: 75 mg por vía oral una vez al día. Terapia Dual (DAPT): dosis de carga inicial única de 300 mg (o 600 mg antes de intervencionismo), seguido de dosis de mantenimiento de 75 mg al día, típicamente durante 21 días (guía CHANCE) o hasta 90 días (guía POINT).",
+            sideEffects = "Hemorragia capilar, equimosis, dolor abdominal difuso, dispepsia, diarrea, erupciones cutáneas. Incidencia extremadamente baja de púrpura trombocitopénica trombótica (PTT) o neutropenia.",
+            clinicalNotes = "Profármaco activado hepáticamente por la vía CYP2C19. Inhibe selectiva e irreversiblemente la unión del ADP a su receptor plaquetario P2Y12. Portadores de alelos de pérdida de función en CYP2C19 (metabolizadores lentos) exhiben menor respuesta antiplaquetaria.",
+            category = "Reperfusión y Antiagregantes"
+        ),
+        DrugReference(
+            name = "Ticagrelor",
+            acronym = "TIC",
+            indications = "Prevención secundaria en terapia dual combinada (DAPT) junto a AAS en pacientes con ACV isquémico agudo menor no cardioembólico o AIT de alto riesgo. Opción preferida en portadores de variantes de pérdida de función de CYP2C19 (esquema THALES).",
+            dosage = "Esquema DAPT (junto a AAS 75-100 mg): Dosis de carga oral inicial única de 180 mg, seguido de dosis de mantenimiento de 90 mg por vía oral cada 12 horas (dos veces al día) durante 30 días continuos.",
+            sideEffects = "Disnea transitoria y no cardiogénica (mediada por acumulación local de adenosina), sangrados mayores o menores, bradiarritmias sinusales ocasionales, elevación transitoria de ácido úrico y creatinina plasmática.",
+            clinicalNotes = "Antagonista directo, potente y reversible del receptor plaquetario P2Y12 de ADP. No requiere activación metabólica hepática (evita variaciones génicas CYP2C19). Vigilar cumplimiento terapéutico por su pauta de dosificación doble diaria (BID).",
+            category = "Reperfusión y Antiagregantes"
         ),
         DrugReference(
             name = "Piridostigmina",
@@ -879,7 +920,7 @@ object ClinicalDatabase {
             dosage = "Mantenimiento: 30 mg a 60 mg por vía oral administrado cada 4 a 6 horas durante el día según las necesidades fluctuantes individuales.",
             sideEffects = "Efectos colinérgicos muscarínicos marcados: aumento de salivación, cólicos abdominales, diarrea severa, fasciculaciones musculares, diaforesis, lagrimeo.",
             clinicalNotes = "Inhibidor reversible de la acetilcolinesterasa. Dosis excesivas provocan crisis colinérgica (debilidad con fasciculaciones que mimetiza crisis miasténica).",
-            category = "Inmunomoduladores / Reperfusión"
+            category = "Fármacos de ELA, Miastenia y Demencias"
         ),
         DrugReference(
             name = "Metilprednisolona (Pulsos)",
@@ -888,7 +929,160 @@ object ClinicalDatabase {
             dosage = "Esquema estándar de pulsos: 1000 mg (1 gramo) intravenoso diluido en solución fisiológica para pasar en 1 a 2 horas, administrado por 3 a 5 días consecutivos.",
             sideEffects = "Hiperglucemia aguda marcada, elevación transitoria de presión arterial, insomnio, sabor metálico oral, psicosis esteroidea, retención de líquidos.",
             clinicalNotes = "No requiere reducción progresiva de dosis si la duración es <5 días. Siempre verificar control glucémico y agregar protector gástrico (IBP).",
-            category = "Inmunomoduladores / Reperfusión"
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Levodopa / Carbidopa",
+            acronym = "L-DOPA",
+            indications = "Enfermedad de Parkinson idiopática avanzada o temprana, parkinsonismo posencefalítico y rigidez fluctuante.",
+            dosage = "Inicio: Usual 25/100 mg por vía oral tres veces al día (TID). Mantenimiento individualizado fluctuante entre 300 mg y 1200 mg de levodopa al día en dosis fraccionadas.",
+            sideEffects = "Náuseas, emesis, hipotensión ortostática, alucinaciones visuales, discinesias motoras de rango pico y fluctuaciones motoras (períodos OFF).",
+            clinicalNotes = "Precursor directo de dopamina coadministrado con inhibidor de la descarboxilasa periférica (carbidopa) para impedir degradación periférica. Absorción influenciada por proteínas de la dieta.",
+            category = "Parkinson y Trastornos del Movimiento"
+        ),
+        DrugReference(
+            name = "Pramipexol",
+            acronym = "PPX",
+            indications = "Monoterapia o coadyuvante en la enfermedad de Parkinson e hiperactividad del síndrome de piernas inquietas.",
+            dosage = "Inicio: 0.125 mg por vía oral TID, duplicando dosis cada 5-7 días hasta mantenimiento estándar de 1.5 mg a 4.5 mg diarios divididos por vía oral.",
+            sideEffects = "Somnolencia diurna súbita ('ataques de sueño'), edemas en miembros inferiores, náuseas, hipotensión, trastornos severos del control de impulsos (hipersexualidad, juego patológico).",
+            clinicalNotes = "Agonista dopaminérgico no ergótico altamente selectivo para los receptores D2/D3. Eliminación vía renal intacta, requiriendo estricto ajuste de dosis.",
+            category = "Parkinson y Trastornos del Movimiento"
+        ),
+        DrugReference(
+            name = "Rasagilina",
+            acronym = "RSG",
+            indications = "Monoterapia en enfermedad de Parkinson temprana o adyuvante con levodopa para reducir fluctuaciones motoras y tiempos de fase OFF.",
+            dosage = "Monoterapia: 1 mg por vía oral una vez al día (QD). Coadyuvante con levodopa: 0.5 mg a 1 mg una vez al día.",
+            sideEffects = "Cefalea sorda, disquinesia aditiva, mareo postural, náuseas, hipotensión ortostática, riesgo de crisis hipertensiva rara.",
+            clinicalNotes = "Inhibidor irreversible selectivo de la monoaminooxidasa tipo B (MAO-B). Interacción farmacológica crítica con opioides/psicotrópicos por riesgo de síndrome serotoninérgico.",
+            category = "Parkinson y Trastornos del Movimiento"
+        ),
+        DrugReference(
+            name = "Entacapona",
+            acronym = "ENT",
+            indications = "Coadyuvante de levodopa/carbidopa en pacientes con enfermedad de Parkinson que experimentan fluctuaciones motoras fin de dosis (wearing-off).",
+            dosage = "Administración de 200 mg por vía oral con cada toma individual de levodopa, hasta un máximo absoluto de 8 tomas diarias (1600 mg/día).",
+            sideEffects = "Incremento de las disquinesias, diarrea severa deshidratante, coloración naranja o marrón de la orina, náuseas.",
+            clinicalNotes = "Inhibidor periférico de la catecol-O-metiltransferasa (COMT). Prolonga la ventana plasmática útil de levodopa.",
+            category = "Parkinson y Trastornos del Movimiento"
+        ),
+        DrugReference(
+            name = "Toxina Botulínica Tipo A",
+            acronym = "BoNT-A",
+            indications = "Distonía cervical focal, blefaroespasmo severo, espasticidad refractaria y profilasis de migraña crónica.",
+            dosage = "Dosis altamente individualizada guiada por electromiografía / ecografía de forma anatómica. Rangos típicos de 100-400 unidades.",
+            sideEffects = "Debilidad muscular local por difusión de dosis, disfagia cervical moderada, dolor localizado en inyección.",
+            clinicalNotes = "Inhibe la liberación presináptica de acetilcolina mediante la escisión específica de la proteína SNAP-25.",
+            category = "Parkinson y Trastornos del Movimiento"
+        ),
+        DrugReference(
+            name = "Interferón Beta-1a",
+            acronym = "IFN-b",
+            indications = "Tratamiento modificador de la enfermedad en Esclerosis Múltiple remitente-recurrente (EMRR) o síndrome clínico aislado.",
+            dosage = "Avonex: 30 mcg IM semanal. Rebif: 44 mcg subcutánea (SC) tres veces por semana (TIW).",
+            sideEffects = "Síndrome pseudogripal tras inyección (atenuable con ibuprofeno), elevación de transaminasas, leucopenia transitoria, depresión.",
+            clinicalNotes = "Inmunomodulador clásico. Requiere control hematológico y de PFH cada 6 meses durante el inicio del tratamiento.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Teriflunomida",
+            acronym = "TFM",
+            indications = "Tratamiento modificador de primera línea en Esclerosis Múltiple remitente-recurrente en adultos.",
+            dosage = "14 mg por vía oral una vez al día (QD) con o sin alimentos.",
+            sideEffects = "Hepatotoxicidad (PFH ↑), alopecia transitoria moderada, diarrea, elevación de presión arterial, neuropatía.",
+            clinicalNotes = "Inhibe la proliferación linfocitaria mediante el bloqueo de la enzima de pirimidina DHODH. Contraindicación absoluta de gestación. Requiere lavado por colestiramina si plan de embarazo.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Fingolimod",
+            acronym = "FGM",
+            indications = "Esclerosis Múltiple remitente-recurrente activa que no responde a terapias de primera línea o de progresión rápida.",
+            dosage = "0.5 mg por vía oral una vez al día (QD). Exige primera dosis monitorizada con ECG de 6 horas.",
+            sideEffects = "Bradicardia sinusal marcada, bloqueos AV transitorios, edema macular bilateral infrecuente, riesgo alto de leucoencefalopatía (PML).",
+            clinicalNotes = "Modulador del receptor S1P. Secuestra linfocitos en ganglios linfáticos alejados de la barrera hematoencefálica.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Natalizumab",
+            acronym = "NTZ",
+            indications = "EM remitente-recurrente altamente activa o progresiva con recaídas frecuentes.",
+            dosage = "300 mg por infusión intravenosa continua cada 4 semanas.",
+            sideEffects = "Riesgo primario de Leucoencefalopatía Multifocal Progresiva (PML) ligada a virus JC, reacciones infusionales.",
+            clinicalNotes = "Anticuerpo contra la integrina alfa-4 (VLA-4), bloqueando el tráfico leucocitario en la barrera hematoencefálica. Exige nivel de anticuerpo JCV basal.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Ocrelizumab",
+            acronym = "OCR",
+            indications = "Esclerosis Múltiple remitente-recurrente y Esclerosis Múltiple primaria progresiva (EMPP) en fases tempranas.",
+            dosage = "Dosis inicial: 300 mg IV de inicio día 1 y 15. Dosis de mantenimiento: 600 mg IV administrados semestralmente cada 6 meses.",
+            sideEffects = "Reacciones transfusionales / infusionales, aumento de riesgo de infecciones de la vía respiratoria y neumonía, riesgo de PML.",
+            clinicalNotes = "Anticuerpo anti-CD20 que causa depleción profunda y selectiva de células B. Requiere cribado de hepatitis B (HBV) antes del inicio del tratamiento.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Satralizumab",
+            acronym = "SAT",
+            indications = "Tratamiento modificador específico para el espectro de Neuromielitis Óptica (NMOSD) con anticuerpos anti-AQP4 positivos.",
+            dosage = "120 mg por vía subcutánea (SC) en las semanas 0, 2 y 4, seguido por un mantenimiento de 120 mg SC cada 4 semanas.",
+            sideEffects = "Reacciones de inyección local, aumento de infecciones respiratorias superiores, neutropenia transitoria, elevación de PFH.",
+            clinicalNotes = "Anticuerpo monoclonal dirigido contra el receptor de interleucina-6 (IL-6R). No es útil ni recomendado en esclerosis múltiple clásica.",
+            category = "Neuroinmunología Desmielinizante"
+        ),
+        DrugReference(
+            name = "Riluzol",
+            acronym = "RLZ",
+            indications = "Tratamiento modificador específico diseñado para enlentecer la progresión en Esclerosis Lateral Amiotrófica (ELA).",
+            dosage = "50 mg por vía oral dos veces al día (BID), idealmente tomado 1 hora antes o 2 horas después de comidas.",
+            sideEffects = "Astenia severa, náuseas, anorexia, dolor abdominal, incremento de transaminasas hepáticas, neutropenia leve.",
+            clinicalNotes = "Bloqueador de corrientes de sodio y modulador de la liberación presináptica de glutamato. Exige control estricto de LFTs (pruebas de función hepática) mensual.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
+        ),
+        DrugReference(
+            name = "Tofersen",
+            acronym = "TFS",
+            indications = "Tratamiento modificador en adultos con Esclerosis Lateral Amiotrófica (ELA) con mutación confirmada en el gen SOD1.",
+            dosage = "100 mg administrados por inyección intratecal (IT) en dosis de carga el día 1, 15 y 29; seguido de mantenimiento regular de 100 mg cada 28 días.",
+            sideEffects = "Meningitis aséptica reactiva, pleocitosis transitoria en LCR, elevación de proteínas en líquido espinal, dolor de espalda.",
+            clinicalNotes = "Oligonucleótido antisentido de vanguardia diseñado para degradar el ARNm mutado de la SOD1 hepato-neuronal.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
+        ),
+        DrugReference(
+            name = "Donepezilo",
+            acronym = "DPZ",
+            indications = "Enfermedad de Alzheimer en fases leve, moderada o grave (rango sintomático cortical).",
+            dosage = "Dosis inicial: 5 mg por vía oral por las noches (QHS). Subir a 10 mg QD tras 4-6 semanas de excelente tolerancia clínica.",
+            sideEffects = "Náuseas potentes, diarrea líquida ocasional, anorexia marcada, insomnio de conciliación, calambres musculares, bradicardia sinusal o bloqueos AV.",
+            clinicalNotes = "Inhibidor reversible altamente específico de la acetilcolinesterasa periférica y central. Interacciones con betabloqueantes aditivos.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
+        ),
+        DrugReference(
+            name = "Memantina",
+            acronym = "MMT",
+            indications = "Enfermedad de Alzheimer en etapas moderadamente severas o graves, ya sea sola o asociada a donepezilo.",
+            dosage = "Dosis de titulación: Iniciar 5 mg QD, subiendo 5 mg semanales hasta un mantenimiento estable de 10 mg por vía oral dos veces al día (20 mg/día).",
+            sideEffects = "Alucinaciones visuales incidentales leves, constipación marcada, mareo postural, somnolencia, hipertensión arterial.",
+            clinicalNotes = "Antagonista no competitivo de afinidad moderada para el receptor de glutamato NMDA. Protege de la excitotoxicidad mediada por calcio. Requiere ajuste estricto si CrCl <30 mL/min.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
+        ),
+        DrugReference(
+            name = "Brexpiprazol",
+            acronym = "BXP",
+            indications = "Tratamiento de la agitación del comportamiento severa asociada a la demencia por enfermedad de Alzheimer.",
+            dosage = "Titulación: 0.5 mg/día en días 1-7, subir a 1 mg/día en días 8-14, y luego dosis objetivo de 2 mg por vía oral una vez al día (QD) de mantenimiento.",
+            sideEffects = "Somnolencia pronunciada, acatisia moderada, aumento del riesgo de eventos vasculares en ancianos (Advertencia de clase).",
+            clinicalNotes = "Agonista parcial de los receptores D2 y 5-HT1A, y antagonista del receptor 5-HT2A. Metabolismo regulado por CYP3A4 y CYP2D6.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
+        ),
+        DrugReference(
+            name = "Lecanemab",
+            acronym = "LCM_A",
+            indications = "Tratamiento modificador en fases ultra-tempranas o deterioro cognitivo leve (DCL) por enfermedad de Alzheimer con placas de amiloide en PET/LCR.",
+            dosage = "Dosis de mantenimiento: 10 mg/kg administrados en infusión intravenosa líquida cada 2 semanas.",
+            sideEffects = "Anomalías de Imagen Relacionadas con el Amiloide: edema cerebral (ARIA-E) y microhemorragias cerebrales (ARIA-H), cefaleas severas.",
+            clinicalNotes = "Anticuerpo monoclonal IgG1 humanizado que aclara los protofilamentos solubles de beta-amiloide soluble cerebral. Exige monitorización rigurosa de seguridad con RM cerebral antes de la 5ª, 7ª y 14ª dosis.",
+            category = "Fármacos de ELA, Miastenia y Demencias"
         )
     )
 
@@ -936,5 +1130,73 @@ object ClinicalDatabase {
         "Grado 4: Incapacidad moderadamente grave. Incapaz de vestirse, asearse o deambular sin asistencia directa.",
         "Grado 5: Incapacidad grave. Postrado en cama por completo, incontinencia urinaria y fecal, requiere cuido permanente.",
         "Grado 6: Éxitus / Fallecido."
+    )
+
+    val dermatomes = listOf(
+        DermatomeReference("C2", "Protuberancia occipital externa", "Región occipital superior y base del cráneo posterior."),
+        DermatomeReference("C3", "Fosa supraclavicular", "Fosa supraclavicular en la línea medioclavicular."),
+        DermatomeReference("C4", "Articulación acromioclavicular", "Región superior del hombro, sobre la articulación acromioclavicular."),
+        DermatomeReference("C5", "Fosa antecubital lateral", "Borde externo del brazo y cara lateral de la fosa antecubital."),
+        DermatomeReference("C6", "Pulgar", "Falange distal del pulgar (primer dedo de la mano)."),
+        DermatomeReference("C7", "Dedo medio", "Falange distal del dedo medio (tercer dedo de la mano)."),
+        DermatomeReference("C8", "Dedo meñique", "Falange distal del dedo meñique (quinto dedo de la mano) en su borde cubital."),
+        DermatomeReference("T1", "Fosa antecubital medial", "Borde interno de la fosa antecubital, proximal al epicóndilo medial."),
+        DermatomeReference("T2", "Vértice de la axila", "Región de la axila medial alta."),
+        DermatomeReference("T4", "Pecho (pezones)", "Cuarto espacio intercostal en la línea medioclavicular."),
+        DermatomeReference("T10", "Ombligo", "Décimo espacio intercostal en la línea medioclavicular (línea umbilical)."),
+        DermatomeReference("L1", "Región inguinal", "Punto medio entre el ligamento inguinal (T12) y L2."),
+        DermatomeReference("L2", "Cara anterior del muslo", "Punto medio de la cara anterior del muslo."),
+        DermatomeReference("L3", "Cóndilo femoral medial", "Zona del cóndilo femoral medial justo por encima de la rodilla anterior."),
+        DermatomeReference("L4", "Maléolo medial", "Maléolo medial del tobillo anterior y cara medial del pie."),
+        DermatomeReference("L5", "Dorso del pie", "Cara dorsal del pie a nivel de la tercera articulación metatarsofalángica."),
+        DermatomeReference("S1", "Borde lateral del talón", "Borde externo del talón y maléolo lateral externo."),
+        DermatomeReference("S2", "Fosa poplítea", "Punto medio de la fosa poplítea detrás de la rodilla."),
+        DermatomeReference("S3", "Tuberosidad isquiática", "Región de la nalga inferior o pliegue glúteo medio."),
+        DermatomeReference("S4-S5", "Región perianal", "Área perianal profunda.")
+    )
+
+    val reflexes = listOf(
+        ReflexReference(
+            name = "Reflejo Bicipital",
+            level = "C5 - C6",
+            nerve = "Nervio Musculocutáneo",
+            response = "Contracción del músculo bíceps y flexión del codo.",
+            clinicalNotes = "Paciente con codo semiflexionado y mano en pronación; percutir sobre el tendón del bíceps en la fosa antecubital."
+        ),
+        ReflexReference(
+            name = "Reflejo Estilorradial / Supinador Largo",
+            level = "C5 - C6",
+            nerve = "Nervio Radial",
+            response = "Flexión y supinación leve de la mano y antebrazo.",
+            clinicalNotes = "Percutir sobre la apófisis estiloides del radio, aproximadamente 2-5 cm proximal a la muñeca."
+        ),
+        ReflexReference(
+            name = "Reflejo Tricipital",
+            level = "C7 - C8",
+            nerve = "Nervio Radial",
+            response = "Flexión menor o extensión del codo.",
+            clinicalNotes = "Sosteniendo el brazo en abducción y antebrazo colgando; percutir directamente el tendón del tríceps sobre el olécranon."
+        ),
+        ReflexReference(
+            name = "Reflejo Patelar / Rotuliano",
+            level = "L2 - L4",
+            nerve = "Nervio Femoral",
+            response = "Extensión de la rodilla por contracción del cuádriceps.",
+            clinicalNotes = "Paciente sentado con piernas colgando libremente; percutir el tendón rotuliano entre la rótula y la tuberosidad de la tibia."
+        ),
+        ReflexReference(
+            name = "Reflejo Aquiliano",
+            level = "S1 - S2",
+            nerve = "Nervio Tibial",
+            response = "Flexión plantar de la articulación del tobillo.",
+            clinicalNotes = "Paciente de rodillas sobre silla o sentado con pie suspendido en ligera flexión dorsal pasiva; percutir tendón de Aquiles."
+        ),
+        ReflexReference(
+            name = "Reflejo Flexor Plantar (Babinski)",
+            level = "L5 - S2",
+            nerve = "Nervio Tibial",
+            response = "Respuesta normal: Flexión plantar de todos los dedos.",
+            clinicalNotes = "Raspado firme del borde externo de la planta del pie. Elevación y abanico del primer dedo (Babinski positivo) indica disfunción suprasegmentaria o del haz piramidal."
+        )
     )
 }
