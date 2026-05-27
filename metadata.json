@@ -1,6 +1,6 @@
 {
   "name": "SynAppSe",
-  "description": "Compendio clínico de Neurología para médicos en formación. Incluye escalas clínicas (NIHSS, ALSFRS-R, QMG, DRAGON), criterios diagnósticos (Gold Coast, EULAR/ACR 2017) y clasificación de epilepsia (ILAE) con copiado estructurado.",
+  "description": "Compendio clínico de Neurología para médicos en formación. Incluye escalas clínicas (NIHSS, ALSFRS-R, QMG, DRAGON), criterios diagnósticos (Gold Coast, Alzheimer TNM-EA, EULAR/ACR 2017) y clasificación de epilepsia (ILAE) con copiado estructurado y escala GDS.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

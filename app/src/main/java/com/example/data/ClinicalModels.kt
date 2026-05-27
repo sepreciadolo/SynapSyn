@@ -483,39 +483,48 @@ object ClinicalDatabase {
 
     val epilepsyClassification = DiagnosticCriteria(
         id = "ilae_epilepsy",
-        name = "Clasificación de Crisis y Epilepsias ILAE",
-        acronym = "ILAE 2017",
-        year = "2017",
-        description = "Marco de clasificación oficial de la Liga Internacional Contra la Epilepsia (ILAE). Estructurado jerárquicamente en: Tipo de Crisis, Tipo de Epilepsia y Síndrome Epiléptico, con identificación simultánea de la etiología subyacente.",
+        name = "Clasificación Actualizada de Crisis y Epilepsias ILAE 2025/2026",
+        acronym = "ILAE 2025",
+        year = "2025",
+        description = "Marco de clasificación actualizado de la Liga Internacional Contra la Epilepsia (ILAE) (Beniczky et al., 2025). Reemplaza la terminología de 2017 por un enfoque basado en reglas taxonómicas estrictas (Clasificadores vs Descriptores) y restaura el término universal 'Consciencia' (Consciousness).",
         sections = listOf(
             DiagnosticCriteriaSection(
-                "1. Clasificación por Tipo de Inicio de Crisis",
+                "1. Clases Principales y Clasificadores (ILAE 2025)",
                 listOf(
-                    "A. Inicio Focal: Se origina dentro de redes limitadas a un solo hemisferio cerebral. Subdividido según conciencia en:\n" +
-                        "   - Focal Consciente (Preserved Awareness)\n" +
-                        "   - Focal de Consciencia Alterada (Impaired Awareness)\n" +
-                        "   - Manifestaciones iniciales: Motoras (automatismos, hipercinéticas, tónicas, clónicas, espasmos) o No motoras (sensoriales, autonómicas, cognitivas, emocionales, arresto de actividad).\n" +
-                        "   - Puede progresar a crisis tónico-clónica bilateral.",
-                    "B. Inicio Generalizado: Se origina rápidamente en un punto y propaga a redes bilaterales de ambos hemisferios simultáneamente. Subdividido en:\n" +
-                        "   - Motoras: Tónico-clónica, clónica, espasmos, mioclónica, mioclónica-atónica, atónica.\n" +
-                        "   - No motoras (Ausencias): Típica, atípica, mioclónica, mioclónica palpebral.",
-                    "C. Inicio Desconocido: Información insuficiente (ej. crisis nocturnas aisladas). Categorizada en: Motora (Tónico-clónica, espasmos) o No motora (arresto de comportamiento).",
-                    "D. No clasificable: Factores de datos insuficientes."
+                    "A. Crisis Focal: Se origina dentro de redes unilaterales limitadas a un hemisferio. Se clasifica según CONSCIENCIA (operacionalizada mediante recuerdo y capacidad de respuesta) en:\n" +
+                        "   - 1.1. Crisis focal con preservación de la consciencia (CFCPC)\n" +
+                        "   - 1.2. Crisis focal con alteración de la consciencia (CFCAC) [Califica por definición como manifestación observable]\n" +
+                        "   - 1.3. Crisis tónico-clónica focal a bilateral (CFTCB) [La rigidez y sacudida son bilaterales, con pérdida de consciencia]",
+                    "B. Crisis Generalizada: Origen en redes bilaterales distribuidas rápidamente. Subgrupos principales:\n" +
+                        "   - 3.1. Crisis de Ausencia (Elimina término 'no motora' por fenómenos motores discretos): Típica, Atípica, Mioclónica, Mioclonía palpebral con/sin ausencia.\n" +
+                        "   - 3.2. Crisis tónico-clónica generalizada (CTCG): Con sacudidas mioclónicas o ausencia al inicio, o término principal autónomo.\n" +
+                        "   - 3.3. Otras crisis generalizadas: Mioclónica, Clónica, Tónica, Atónica, Mioclónica-atónica, Espasmo epiléptico generalizado, y MIOCLONUS NEGATIVO GENERALIZADO (MNG) [Admitido como tipo de crisis diferenciado en 2025].",
+                    "C. Se desconoce si es focal o generalizada: Casos con información incompleta al inicio, clasificada en:\n" +
+                        "   - 2.1. Con preservación de la conciencia (PC)\n" +
+                        "   - 2.2. Con alteración de la conciencia (AC)\n" +
+                        "   - 2.3. Crisis tónico-clónica bilateral (TCB)",
+                    "D. No clasificable: Información insuficiente por completo (ej. sin testigos ni registros de video/EEG)."
                 )
             ),
             DiagnosticCriteriaSection(
-                "2. Tipo de Epilepsia (Nivel Diagnóstico II)",
+                "2. Descriptores de Semiología (Básicos y Extendidos)",
                 listOf(
-                    "- Epilepsia Focal: Crisis predominantemente focales. EEG muestra descargas focales.",
-                    "- Epilepsia Generalizada: Crisis predominantemente generalizadas. EEG con descargas generalizadas punta-onda lenta bilaterales sincrónicas.",
-                    "- Epilepsia Combinada (Focal y Generalizada): Presencia simultánea de crisis focales y generalizadas en el mismo paciente (característico de síndromes complejos como Lennox-Gastaut).",
-                    "- Epilepsia Desconocida: Certeza diagnóstica de epilepsia pero sin datos suficientes para discriminar tipo."
+                    "• Descriptores Básicos: Se describe dicotómicamente si la crisis es 'Con manifestaciones observables' o 'Sin manifestaciones observables'. (La afasia o el rubor son observables).",
+                    "• Descriptores Extendidos (Evoluciónd de Semiología): Se describe la secuencia cronológica de los fenómenos ictales (ej. aura epigástrica -> automatismo gestual -> consciencia alterada). Evita depender solo del signo inicial.",
+                    "• Fenómenos Motores Elementales: Acinético, atónico, clónico, distónico, nistagmus, espasmo, parpadeo, desv. cefálica, mioclónico, mioclonus negativo, tónico, versiva.",
+                    "• Fenómenos Motores Complejos: Automatismos (distales o proximales, gestuales, de mímica, oroalimentarios, verbales, vocales), comportamiento hipercinético/motor.",
+                    "• Fenómenos Sensoriales y Cognitivos: Auditivos, visuales, somatosensoriales, de lenguaje (afasia), confusión, dismnesia, déjà vu/jamais vu, afectivos (ansiedad, enojo, éxtasis, culpa)."
                 )
             ),
             DiagnosticCriteriaSection(
-                "3. Etiologías ILAE (Considerar siempre)",
+                "3. Cambios Clave: Versión 2017 vs Actualización 2025",
                 listOf(
-                    "Estructural (lesiones visibles en RMN), Genética, Infecciosa (cisticercosis, tuberculosis), Metabólica, Inmunológica (encefalitis autoinmunes), o Desconocida."
+                    "1. Eliminación del término 'Inicio' (Onset) de las clases principales: Se reduce redundancia puesto que crisis generalizadas pueden tener inicio focal microscópico.",
+                    "2. Regla Taxonómica Estricta: Clasificadores (clases biológicas con impacto terapéutico como consciencia, tipo de crisis, clase principal) vs Descriptores (características clínicas que orientan manejo pero no definen tipo, ej. semiología).",
+                    "3. De 'Awareness/Alerta' a 'Consciencia' (Consciousness): Término universalmente aceptado y más traducible. Definido operacionalmente por la capacidad de recordar (awareness) y responder.",
+                    "4. De 'Motor/No motor' en Focales a 'Manifestaciones Observables vs No Observables' en versión básica.",
+                    "5. Reconocimiento del Mioclonus Negativo Epiléptico Generalizado como tipo de crisis autónomo (antes omitido).",
+                    "6. Espasmos epilépticos se consideran tipo de crisis en generalizadas, pero descriptor semiológico en focales/desconocidas."
                 )
             )
         )
