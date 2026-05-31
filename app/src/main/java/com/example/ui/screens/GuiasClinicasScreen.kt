@@ -250,11 +250,12 @@ fun TabGuiasYEscalas(
 
                 val categories = listOf(
                     Triple("urgencias", "Urgencias Críticas y de Tallo", Pair("ACV agudo, Muerte cerebral, Vértigo agudo (HINTS+), Estado epiléptico, Coma, Meningitis aguda", Icons.Default.LocalHospital)),
+                    Triple("examen", "Examen Físico Neurológico", Pair("Pares craneales, evaluación de fuerza y tono motor, dermatomas sensitivos, y reflejos osteotendinosos bedside", Icons.Default.AccessibilityNew)),
+                    Triple("escalas", "Escalas de Valoración Rápida", Pair("Gravedad funcional global con Rankin mRS, Reisberg y FAST en demencia, clases clínicas de miastenia MGFA", Icons.Default.Layers)),
                     Triple("neuroinfecto", "Neuroinfectología Bedside", Pair("Triage de patógenos, Análisis de LCR interactiva y algoritmo de tratamiento empírico de meningitis", Icons.Default.Science)),
                     Triple("vascular", "Neurovascular Avanzado", Pair("Prevención secundaria, TIA minor stroke, HIC, HSA, TVC, Nomograma Heparina e inició DAPT", Icons.Default.Shield)),
                     Triple("inmunologia", "Neuroinmunología & Epilepsia", Pair("Criterios McDonald 2024, NMOSD, Encefalitis autoinmune, Seguridad DMTs, ASM y toxicidad", Icons.Default.AutoAwesome)),
                     Triple("cognicion", "Cognición y Movimiento", Pair("Biomarcadores AD 2024, Monoclonales Antiamiloide, Parkinson avanzado DBS, Toxina botulínica", Icons.Default.Psychology)),
-                    Triple("escalas", "Escalas y Examen Rápido", Pair("Rankin mRS, FAST demencia, clases MGFA, reflejos osteotendinosos y dermatomas interactivos", Icons.Default.Layers)),
                     Triple("ordenes", "Generador de Órdenes y Notas", Pair("Estructura de órdenes rápidas de ingreso a urgencias y notas de evolución neuro-UCI", Icons.Default.Assignment))
                 )
 
@@ -262,6 +263,7 @@ fun TabGuiasYEscalas(
                     val (desc, icon) = meta
                     val accentColor = when (id) {
                         "urgencias" -> Color(0xFFE11D48)
+                        "examen" -> Color(0xFF8B5CF6)
                         "neuroinfecto" -> Color(0xFF059669)
                         "vascular" -> Color(0xFF2563EB)
                         "inmunologia" -> Color(0xFF7C3AED)
@@ -380,6 +382,7 @@ fun TabGuiasYEscalas(
                         Text(
                             text = when (selectedSectionId) {
                                 "urgencias" -> "Urgencias Críticas"
+                                "examen" -> "Examen Físico"
                                 "vascular" -> "Neurovascular Avanzado"
                                 "neuroinfecto" -> "Neuroinfectología Bedside"
                                 "inmunologia" -> "Neuroinmuno & Epilepsia"
@@ -480,6 +483,16 @@ fun TabGuiasYEscalas(
                                     recentHistoryContent = recentHistoryContent,
                                     onCopyClicked = onCopyClicked
                                 )
+                            }
+                            "examen" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    ExamenFisicoCard(onCopyClicked = onCopyClicked)
+                                }
                             }
                             "ordenes" -> {
                                 OrdersAndNotesGenerator()
@@ -2607,7 +2620,7 @@ fun LegacyBedsideScales(
     recentHistoryContent: @Composable () -> Unit,
     onCopyClicked: (String, String, String) -> Unit
 ) {
-    var selectedSubCategory by remember { mutableStateOf("mrs") } // "mrs", "fast", "mgfa", "examen", "historial"
+    var selectedSubCategory by remember { mutableStateOf("mrs") } // "mrs", "fast", "mgfa", "historial"
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -2621,7 +2634,6 @@ fun LegacyBedsideScales(
                 "mrs" to "Rankin (mRS)",
                 "fast" to "Reisberg (FAST)",
                 "mgfa" to "Clasif. MGFA",
-                "examen" to "Examen Físico",
                 "historial" to "Historial de Cálculos"
             ).forEach { (id, title) ->
                 val isSelected = selectedSubCategory == id
@@ -2784,16 +2796,6 @@ fun LegacyBedsideScales(
                                 Text("Copiar Clasificación MGFA")
                             }
                         }
-                    }
-                }
-                "examen" -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ExamenFisicoCard(onCopyClicked = onCopyClicked)
                     }
                 }
                 "historial" -> {
@@ -3149,7 +3151,9 @@ fun CalculatodasYScoresView(
         "📜 Marais TBM Criteria",
         "👶 BMS (Meningitis Peds)",
         "🔬 BM-CASCO (Adultos)",
-        "💧 Presión Cripto (PL Drenaje)"
+        "💧 Presión Cripto (PL Drenaje)",
+        "🧬 Índice IgG & Q-Alb",
+        "💊 Ajuste Renal Antibióticos"
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -3188,8 +3192,284 @@ fun CalculatodasYScoresView(
                     3 -> BmsPediatricCalculator(onCopyClicked)
                     4 -> BmCascoCalculator(onCopyClicked)
                     5 -> CryptococoPressureCalculator(onCopyClicked)
+                    6 -> IgGIndexAndQAlbCalculator(onCopyClicked)
+                    7 -> RenalAntibioticDosingCalculator(onCopyClicked)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun IgGIndexAndQAlbCalculator(onCopyClicked: (String, String, String) -> Unit) {
+    var albCsfStr by remember { mutableStateOf("") }
+    var albSerStr by remember { mutableStateOf("") }
+    var iggCsfStr by remember { mutableStateOf("") }
+    var iggSerStr by remember { mutableStateOf("") }
+
+    val albCsf = albCsfStr.toDoubleOrNull() ?: 0.0
+    val albSer = albSerStr.toDoubleOrNull() ?: 0.0
+    val iggCsf = iggCsfStr.toDoubleOrNull() ?: 0.0
+    val iggSer = iggSerStr.toDoubleOrNull() ?: 0.0
+
+    val qAlb = if (albSer > 0.0) albCsf / albSer else 0.0
+
+    val iggIndex = if (iggSer > 0.0 && albCsf > 0.0 && albSer > 0.0) {
+        (iggCsf / iggSer) / (albCsf / albSer)
+    } else {
+        0.0
+    }
+
+    val qAlbInterpret = when {
+        qAlb == 0.0 -> "Esperando datos..."
+        qAlb < 6.5 -> "Normal (Integridad de BHE conservada)"
+        qAlb in 6.5..9.0 -> "Límite normal (Leve trastorno de BHE si edad > 40 años)"
+        else -> "BHE alterada/permeable (Trastorno moderado-severo)"
+    }
+
+    val iggInterpret = when {
+        iggIndex == 0.0 -> "Esperando datos..."
+        iggIndex in 0.3..0.7 -> "Normal (0.3 - 0.7, sin síntesis intratecal)"
+        iggIndex < 0.3 -> "Disminuido (Raro, posible dilución o pérdida inmunoglobulinas)"
+        else -> "ELEVADO (>0.70, sugiere Síntesis Intratecal Activa. Común en Esclerosis Múltiple, Neuroinfecciones crónicas como lúes, panencefalitis o autoanticuerpos)"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("🧬 Índices Intratecales: IgG & Q-Albúmina", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text("Permite evaluar la integridad de la barrera hematoencefálica (BHE) y la síntesis intratecal de inmunoglobulinas.", style = MaterialTheme.typography.labelSmall)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            Button(
+                onClick = { albCsfStr = "15"; albSerStr = "4.2"; iggCsfStr = "1.2"; iggSerStr = "1.1" },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+            ) {
+                Text("Normal", fontSize = 10.sp)
+            }
+            Button(
+                onClick = { albCsfStr = "45"; albSerStr = "3.8"; iggCsfStr = "3.2"; iggSerStr = "0.9" },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+            ) {
+                Text("Barrera Alterada", fontSize = 10.sp)
+            }
+            Button(
+                onClick = { albCsfStr = "18"; albSerStr = "4.1"; iggCsfStr = "4.8"; iggSerStr = "1.0" },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+            ) {
+                Text("Síntesis Intratecal (EM/SGB)", fontSize = 10.sp)
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = albCsfStr,
+                onValueChange = { albCsfStr = it },
+                label = { Text("Albúmina LCR (mg/dL)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+            OutlinedTextField(
+                value = albSerStr,
+                onValueChange = { albSerStr = it },
+                label = { Text("Albúmina Suero (g/dL)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = iggCsfStr,
+                onValueChange = { iggCsfStr = it },
+                label = { Text("IgG LCR (mg/dL)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+            OutlinedTextField(
+                value = iggSerStr,
+                onValueChange = { iggSerStr = it },
+                label = { Text("IgG Suero (g/dL)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Resultados e Interpretación:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text("Cociente Albúmina (Q-Alb):", style = MaterialTheme.typography.bodySmall)
+                    Text(String.format("%.2f", qAlb), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                }
+                Text("BHE: $qAlbInterpret", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text("Índice de IgG LCR:", style = MaterialTheme.typography.bodySmall)
+                    Text(String.format("%.2f", iggIndex), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (iggIndex > 0.70) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                }
+                Text("Inmunidad: $iggInterpret", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+            }
+        }
+
+        Button(
+            onClick = {
+                val resultsStr = "Índices LCR: Cociente Albúmina (Q-Alb)=${String.format("%.2f", qAlb)}, Índice de IgG LCR=${String.format("%.2f", iggIndex)}. Interpretación: Q-Alb: $qAlbInterpret, IgG: $iggInterpret."
+                onCopyClicked("Índices Intratecales IgG/Q-Alb", "Análisis Avanzado LCR", resultsStr)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Copiar Reporte de Índices")
+        }
+    }
+}
+
+@Composable
+fun RenalAntibioticDosingCalculator(onCopyClicked: (String, String, String) -> Unit) {
+    var ageStr by remember { mutableStateOf("") }
+    var weightStr by remember { mutableStateOf("") }
+    var creatinineStr by remember { mutableStateOf("") }
+    var isFemale by remember { mutableStateOf(false) }
+
+    val age = ageStr.toDoubleOrNull() ?: 0.0
+    val weight = weightStr.toDoubleOrNull() ?: 0.0
+    val creatinine = creatinineStr.toDoubleOrNull() ?: 0.0
+
+    val gfr = if (creatinine > 0.0 && weight > 0.0 && age > 0.0) {
+        val calc = ((140.0 - age) * weight) / (72.0 * creatinine)
+        if (isFemale) calc * 0.85 else calc
+    } else {
+        0.0
+    }
+
+    val aciclovirDose = when {
+        gfr == 0.0 -> "Esperando datos..."
+        gfr > 50 -> "10 mg/kg IV cada 8 horas (Dosis Completa)"
+        gfr in 25.0..50.0 -> "10 mg/kg IV cada 12 horas"
+        gfr in 10.0..25.0 -> "10 mg/kg IV cada 24 horas"
+        else -> "5 mg/kg IV cada 24 horas (¡Alto riesgo de nefrotoxicidad por cristales!)"
+    }
+
+    val ampiDose = when {
+        gfr == 0.0 -> "Esperando datos..."
+        gfr >= 50 -> "2 g IV cada 4 horas (12 g/día, Dosis Meningitis Listeria)"
+        gfr in 15.0..50.0 -> "2 g IV cada 6 horas"
+        else -> "2 g IV cada 12 horas"
+    }
+
+    val meroDose = when {
+        gfr == 0.0 -> "Esperando datos..."
+        gfr >= 50 -> "2 g IV cada 8 horas"
+        gfr in 26.0..50.0 -> "1 g IV cada 8 horas (o 2 g cada 12 horas)"
+        gfr in 10.0..25.0 -> "1 g IV cada 12 horas"
+        else -> "500 mg IV cada 24 horas"
+    }
+
+    val cefepimeDose = when {
+        gfr == 0.0 -> "Esperando datos..."
+        gfr >= 80 -> "2 g IV cada 8 horas"
+        gfr in 50.0..80.0 -> "2 g IV cada 12 horas"
+        gfr in 11.0..49.0 -> "1 g IV cada 12 horas"
+        else -> "1 g IV cada 24 horas (¡Riesgo extremo de neurotoxicidad: mioclonías, estatus epiléptico!)"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("💊 Ajuste de Antivirales y Antibióticos (Meningoencefalitis)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text("Calcula el aclaramiento de creatinina (Cockcroft-Gault) y sugiere dosis corregidas para el SNC.", style = MaterialTheme.typography.labelSmall)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = ageStr,
+                onValueChange = { ageStr = it },
+                label = { Text("Edad (años)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+            OutlinedTextField(
+                value = weightStr,
+                onValueChange = { weightStr = it },
+                label = { Text("Peso (kg)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+            OutlinedTextField(
+                value = creatinineStr,
+                onValueChange = { creatinineStr = it },
+                label = { Text("Creatinina (mg/dL)", fontSize = 10.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f).height(48.dp)
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Sexo biológico:", style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = !isFemale, onClick = { isFemale = false })
+                Text("Masc", style = MaterialTheme.typography.bodySmall)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = isFemale, onClick = { isFemale = true })
+                Text("Fem", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))) {
+            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text("Depuración Estimada (CrCl):", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (gfr > 0.0) String.format("%.1f mL/min", gfr) else "Esperando datos...",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        if (gfr > 0.0) {
+            Text("Dosis Guiadas para Infección de SNC:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                DoseSuggestionItem("Aciclovir (VHS/VZV Encefalitis)", aciclovirDose, "Meta: Mantener hidratación continua vigorosa.")
+                DoseSuggestionItem("Ceftriaxona (Pneumococo/Meningococo)", "2 g IV cada 12 horas (Sin cambios)", "No requiere ajuste renal.")
+                DoseSuggestionItem("Ampicilina (Listeria monocytogenes)", ampiDose, "Ajustado por depuración renal.")
+                DoseSuggestionItem("Meropenem (Infección Nosocomial / Pseudomonas)", meroDose, "Alta penetración a SNC en cuadro inflamatorio.")
+                DoseSuggestionItem("Cefepima (Sospecha Pseudomonas)", cefepimeDose, "Vigilancia estrecha de neurotoxicidad de ser <30.")
+            }
+
+            Button(
+                onClick = {
+                    val doseStr = "Aclaramiento Creatinina: ${String.format("%.1f", gfr)} mL/min (Edad=$age, Peso=$weight, Cr=$creatinine). Dosis sugeridas SNC: Aciclovir: $aciclovirDose, Ampicilina: $ampiDose, Meropenem: $meroDose, Cefepima: $cefepimeDose."
+                    onCopyClicked("Ajuste Renal Antibióticos", "Farmacología Neuroinfecto", doseStr)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Copiar Pauta Farmacológica")
+            }
+        }
+    }
+}
+
+@Composable
+fun DoseSuggestionItem(drug: String, dose: String, note: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(drug, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text(dose, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(note, style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

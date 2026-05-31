@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.os.Build
+import android.os.Vibrator
+import android.os.VibrationEffect
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -24,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,12 +59,12 @@ fun MainScreen(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val currentLocalContext = LocalContext.current
     val scope = rememberCoroutineScope()
 
     // Volatile Room session cache database setup
-    val appDb = AppRoomDatabase.getDatabase(context)
-    val calculationDao = appDb.savedCalculationDao()
-    val calculationRepository = remember { SavedCalculationRepository(calculationDao) }
+    val appDb = remember(context) { AppRoomDatabase.getDatabase(context.applicationContext) }
+    val calculationRepository = remember(appDb) { SavedCalculationRepository(appDb.savedCalculationDao()) }
     val savedCalculations by calculationRepository.allCalculations.collectAsState(initial = emptyList())
 
     // Navigation and search states
@@ -136,22 +142,49 @@ fun MainScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (darkTheme) Color.Black else MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.background
+                                )
+                            )
+                        )
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "SynAppSe",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.MedicalServices,
+                                        contentDescription = "Medical System logo",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "SynAppSe",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = (-0.5).sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             )
-                        )
+                        }
                         IconButton(
                             onClick = onToggleTheme,
                             modifier = Modifier.testTag("toggle_theme_button")
@@ -165,14 +198,14 @@ fun MainScreen(
                     }
 
                     if (activeTab == 0) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // Global Search Box with Acronym matching
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             placeholder = { Text("Buscar acrónimo o tema (e.g., NIHSS, ELA, TNK, TOAST)...") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar", tint = MaterialTheme.colorScheme.primary) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { searchQuery = "" }) {
@@ -183,10 +216,12 @@ fun MainScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("global_search_input"),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                             ),
                             singleLine = true
                         )
@@ -799,6 +834,7 @@ fun TabCalculadoras(
     activeCalculatorId: String?,
     onActiveCalculatorIdChanged: (String?) -> Unit
 ) {
+    val localContext = LocalContext.current
 
     var isNihssCalculated by remember { mutableStateOf(false) }
     var nihssCalculatedScore by remember { mutableStateOf(0) }
@@ -843,13 +879,31 @@ fun TabCalculadoras(
     // AIMS
     val aimsSelections = remember { mutableStateMapOf<Int, Int>().apply { (1..12).forEach { put(it, 0) } } }
 
-    // MDS-UPDRS
-    val updrsSelections = remember { mutableStateMapOf<Int, Int>().apply { (1..3).forEach { put(it, 0) } } }
+    // MDS-UPDRS (Full Part III - 14 key clinical items)
+    val updrsSelections = remember { mutableStateMapOf<Int, Int>().apply { (1..14).forEach { put(it, 0) } } }
+    
+    // Webster Parkinson's Rating Scale (10 key clinical items)
+    val websterSelections = remember { mutableStateMapOf<Int, Int>().apply { (1..10).forEach { put(it, 0) } } }
     var metronomeActive by remember { mutableStateOf(false) }
     var metronomeHz by remember { mutableStateOf(1) }
+    var metronomeBpm by remember { mutableStateOf(60) }
+    var metronomeVibrate by remember { mutableStateOf(true) }
+
+    val ctx = localContext
+    val vibrator = remember {
+        try {
+            @Suppress("DEPRECATION")
+            ctx.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+        } catch (e: Throwable) {
+            null
+        }
+    }
 
     // Hoehn y Yahr
     var hoehnYahrSelected by remember { mutableStateOf<Double?>(null) }
+
+    // Schwab & England ADL
+    var schwabSelected by remember { mutableStateOf<Int?>(null) }
 
     // Toxina
     var toxinaBrand by remember { mutableStateOf("botox") }
@@ -965,8 +1019,10 @@ fun TabCalculadoras(
         "ledd" to "movimientos_anormales",
         "aims" to "movimientos_anormales",
         "mdsupdrs" to "movimientos_anormales",
+        "webster" to "movimientos_anormales",
         "hoehn_yahr" to "movimientos_anormales",
         "toxina" to "movimientos_anormales",
+        "schwab" to "movimientos_anormales",
         
         "thwaites" to "neuroinfecto",
         "lcr" to "neuroinfecto",
@@ -993,7 +1049,9 @@ fun TabCalculadoras(
         Pair("ledd", "Dosis LEDD"),
         Pair("aims", "AIMS Escala"),
         Pair("mdsupdrs", "MDS-UPDRS III"),
+        Pair("webster", "Escala Webster"),
         Pair("hoehn_yahr", "Hoehn y Yahr"),
+        Pair("schwab", "Schwab & England ADL"),
         Pair("toxina", "Dilución Toxina"),
         Pair("hachinski", "Hachinski"),
         Pair("cdr", "CDR Demencia"),
@@ -1150,7 +1208,7 @@ fun TabCalculadoras(
                         Triple("desmielinizante", "Neuroinmunología / EDSS", "Línea temporal y nivel de discapacidad (EDSS)"),
                         Triple("union_neuromuscular", "Unión Neuromuscular & Miopatías", "ALSFRS-R, QMG, escalas de debilidad segmentaria mEGOS y EGRIS"),
                         Triple("movimientos_anormales", "Trastornos del Movimiento", "Cálculo de dopamina LEDD, AIMS, MDS-UPDRS, H&Y"),
-                        Triple("neuroinfecto", "Neuroinfección & Lab LCR", "Indexación Thwaites y análisis de LCR"),
+                        Triple("neuroinfecto", "Neuroinfección & Lab LCR", "Thwaites, Marais, BM-CASCO, índices de LCR (IgG/Q-Alb) y ajuste renal de dosis"),
                         Triple("otros", "Cognitivo, Delirium y Depresión", "Criterios Hachinski, CDR Clínico, GDS-15, Triage 4AT")
                     )
 
@@ -1360,8 +1418,10 @@ fun TabCalculadoras(
                                 "megos" -> "Score modificado de mEGOS para predecir capacidad de marcha a las semanas del GBS."
                                 "ledd" -> "Dosis Equivalente Diaria de Levodopa (LEDD) para control de antiparkinsonianos."
                                 "aims" -> "Escala de Movimientos Involuntarios Anormales para evaluar discinesia tardía."
-                                "mdsupdrs" -> "MDS-UPDRS sección motora rápida y metrónomo de marcha calibrado."
+                                "mdsupdrs" -> "MDS-UPDRS sección motora completa (Sección III) y metrónomo calibrado de marcha."
+                                "webster" -> "Escala de Webster para valoración del nivel de incapacidad y gravedad clínica en Parkinson."
                                 "hoehn_yahr" -> "Clasificación de la progresión y grado de discapacidad clínica en Parkinson."
+                                "schwab" -> "Escala de Actividades de la Vida Diaria (ADL) de Schwab & England para estimar independencia funcional en Parkinson."
                                 "toxina" -> "Calculadora de dilución volumétrica de Toxina Botulínica por dosis terapéutica."
                                 "hachinski" -> "Puntaje de isquemia para diferenciar demencia vascular de degenerativa."
                                 "cdr" -> "Clasificación de Demencia Clínica para estadiaje cognitivo general."
@@ -2363,19 +2423,117 @@ fun TabCalculadoras(
                                 Column(modifier = Modifier.padding(14.dp)) {
                                     Text("LCR / Análisis Citoquímico", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("Ingrese los valores de citoquímico de LCR para interpretación automatizada de meningoencefalitis y corrección de pleocitosis.", style = MaterialTheme.typography.bodySmall)
+                                    Text("Análisis interpretativo automatizado de meningoencefalitis y corrección de pleocitosis por punción traumática.", style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
                         item {
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    OutlinedTextField(value = lcrLeukos, onValueChange = { lcrLeukos = it }, label = { Text("Leucocitos (células/µL)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                                    OutlinedTextField(value = lcrPmn, onValueChange = { lcrPmn = it }, label = { Text("Porcentaje PMN (%)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                                    OutlinedTextField(value = lcrProteins, onValueChange = { lcrProteins = it }, label = { Text("Proteínas en LCR (mg/dL)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                                    OutlinedTextField(value = lcrGlucoseLcr, onValueChange = { lcrGlucoseLcr = it }, label = { Text("Glucosa en LCR (mg/dL)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                                    OutlinedTextField(value = lcrGlucoseSerum, onValueChange = { lcrGlucoseSerum = it }, label = { Text("Glucosa Sérica (mg/dL)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                                    OutlinedTextField(value = lcrErythros, onValueChange = { lcrErythros = it }, label = { Text("Eritrocitos (para punción traumática, células/µL)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Biotech,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            text = "Conteo Celular (Citología)",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    
+                                    OutlinedTextField(
+                                        value = lcrLeukos,
+                                        onValueChange = { lcrLeukos = it },
+                                        label = { Text("Leucocitos totales (células/µL)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    
+                                    OutlinedTextField(
+                                        value = lcrPmn,
+                                        onValueChange = { lcrPmn = it },
+                                        label = { Text("Polimorfonucleares (PMN %)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    
+                                    OutlinedTextField(
+                                        value = lcrErythros,
+                                        onValueChange = { lcrErythros = it },
+                                        label = { Text("Eritrocitos en LCR (células/µL)") },
+                                        supportingText = { Text("Para corrección de punción traumática (1:700)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                }
+                            }
+                        }
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Science,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            text = "Química de LCR y Relaciones",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    
+                                    OutlinedTextField(
+                                        value = lcrProteins,
+                                        onValueChange = { lcrProteins = it },
+                                        label = { Text("Proteínas en LCR (mg/dL)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    
+                                    OutlinedTextField(
+                                        value = lcrGlucoseLcr,
+                                        onValueChange = { lcrGlucoseLcr = it },
+                                        label = { Text("Glucosa en LCR (mg/dL)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+                                    
+                                    OutlinedTextField(
+                                        value = lcrGlucoseSerum,
+                                        onValueChange = { lcrGlucoseSerum = it },
+                                        label = { Text("Glucosa Sérica concomitante (mg/dL)") },
+                                        supportingText = { Text("Para cálculo de la relación LCR/Suero") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
                                 }
                             }
                         }
@@ -2569,49 +2727,223 @@ fun TabCalculadoras(
                             }
                         }
                         item {
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                                Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("METRÓNOMO VISUAL PARA EXAMEN", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(onClick = { metronomeActive = !metronomeActive }, colors = ButtonDefaults.buttonColors(containerColor = if (metronomeActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)) {
-                                            Text(if (metronomeActive) "Detener Metrónomo" else "Iniciar Metrónomo")
+                            var metronomeTickActive by remember { mutableStateOf(false) }
+
+                            LaunchedEffect(metronomeActive, metronomeBpm) {
+                                if (metronomeActive) {
+                                    val interval = (60000.0 / metronomeBpm).toLong()
+                                    while (true) {
+                                        metronomeTickActive = true
+                                        if (metronomeVibrate && vibrator != null) {
+                                            try {
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                    vibrator.vibrate(VibrationEffect.createOneShot(50L, VibrationEffect.DEFAULT_AMPLITUDE))
+                                                } else {
+                                                    @Suppress("DEPRECATION")
+                                                    vibrator.vibrate(50L)
+                                                }
+                                            } catch (e: Exception) {
+                                                // safe catch
+                                            }
                                         }
-                                        Button(onClick = { metronomeHz = 1 }, colors = ButtonDefaults.buttonColors(containerColor = if (metronomeHz == 1) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (metronomeHz == 1) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                            Text("1 Hz")
+                                        delay(80L)
+                                        metronomeTickActive = false
+                                        delay(java.lang.Math.max(20L, interval - 80L))
+                                    }
+                                } else {
+                                    metronomeTickActive = false
+                                }
+                            }
+
+                            val pulseScale by animateFloatAsState(
+                                targetValue = if (metronomeTickActive) 1.3f else 0.8f,
+                                animationSpec = tween(durationMillis = 80),
+                                label = "metronomePulseScale"
+                            )
+                            val pulseColor by animateColorAsState(
+                                targetValue = if (metronomeTickActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                animationSpec = tween(durationMillis = 80),
+                                label = "metronomePulseColor"
+                            )
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        "METRÓNOMO CLÍNICO Y SENSORIAL",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Asistente háptico y visual para guiar el examen de tapping y de marcha.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Controles principales
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Play / Stop Button
+                                        Button(
+                                            onClick = { metronomeActive = !metronomeActive },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (metronomeActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = if (metronomeActive) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                                contentDescription = if (metronomeActive) "Detener" else "Iniciar",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(if (metronomeActive) "Detener" else "Iniciar")
                                         }
-                                        Button(onClick = { metronomeHz = 2 }, colors = ButtonDefaults.buttonColors(containerColor = if (metronomeHz == 2) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (metronomeHz == 2) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                            Text("2 Hz")
+
+                                        // Vibration Switch
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "Vibración: ",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Switch(
+                                                checked = metronomeVibrate,
+                                                onCheckedChange = { metronomeVibrate = it }
+                                            )
                                         }
                                     }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Slider para BPM
+                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                "Ritmo personalizado:",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                "$metronomeBpm SPM / BPM",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Slider(
+                                            value = metronomeBpm.toFloat(),
+                                            onValueChange = { metronomeBpm = it.toInt() },
+                                            valueRange = 40f..200f,
+                                            steps = 159
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Ajustes rápidos (Presets)
+                                    Text(
+                                        "Preajustes Clínicos rápidos:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.Start),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        val presets = listOf(
+                                            Pair(60, "60 BPM\n(1 Hz/Lento)"),
+                                            Pair(90, "90 BPM\n(Cadencia)"),
+                                            Pair(110, "110 BPM\n(Marcha)"),
+                                            Pair(120, "120 BPM\n(2 Hz/Tapping)")
+                                        )
+                                        presets.forEach { (bpm, label) ->
+                                            val isSel = metronomeBpm == bpm
+                                            Button(
+                                                onClick = {
+                                                    metronomeBpm = bpm
+                                                    metronomeHz = if (bpm >= 120) 2 else 0
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                    contentColor = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(
+                                                    label,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     if (metronomeActive) {
                                         Spacer(modifier = Modifier.height(16.dp))
-                                        val infiniteTransition = rememberInfiniteTransition(label = "metronomePulse")
-                                        val scale by infiniteTransition.animateFloat(
-                                            initialValue = 0.5f,
-                                            targetValue = 1.3f,
-                                            animationSpec = infiniteRepeatable(
-                                                animation = tween(if (metronomeHz == 1) 1000 else 500, easing = LinearEasing),
-                                                repeatMode = RepeatMode.Reverse
-                                            ),
-                                            label = "metronomePulseScale"
-                                        )
                                         Box(
                                             modifier = Modifier
                                                 .size(48.dp)
-                                                .graphicsLayer { scaleX = scale; scaleY = scale }
-                                                .background(MaterialTheme.colorScheme.onErrorContainer, shape = androidx.compose.foundation.shape.CircleShape)
-                                        )
+                                                .graphicsLayer {
+                                                    scaleX = pulseScale
+                                                    scaleY = pulseScale
+                                                }
+                                                .background(pulseColor, shape = CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .background(MaterialTheme.colorScheme.onPrimary, shape = CircleShape)
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Pulsando ritmo a ${if (metronomeHz == 1) "60" else "120"} BPM", style = MaterialTheme.typography.bodySmall, fontStyle = FontStyle.Italic)
+                                        Text(
+                                            "Pulsando ritmo a $metronomeBpm BPM (${String.format("%.2f", metronomeBpm / 60.0)} Hz)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontStyle = FontStyle.Italic,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                     }
                                 }
                             }
                         }
                         val tasks = listOf(
-                            "3.4 Golpeteo de dedos (Finger tapping, alternando con máxima amplitud)",
-                            "3.5 Movimientos de las manos (abrir/cerrar de forma sucesiva)",
-                            "3.6 Pronación-supinación de las manos (brazos extendidos, rápido)"
+                            "3.1 Habla u Oral (Voz, volumen, articulación e inteligibilidad general)",
+                            "3.2 Expresión facial (Parpadeo espontáneo y amimia facial)",
+                            "3.3 Rigidez (Evaluación del tono con el paciente relajado en reposo pasivo)",
+                            "3.4 Golpeteo de dedos (Finger Tapping - rápida y máxima amplitud)",
+                            "3.5 Movimientos de las manos (Abrir/Cerrar puño de manera sucesivo)",
+                            "3.6 Pronación-supinación de las manos (Alzada rápida de manos extendidas)",
+                            "3.7 Golpeteo de dedos del pie (Toe Tapping - golpeteos rápidos del metatarso)",
+                            "3.8 Agilidad de las piernas (Elevar rodilla/talón fuertemente desde sentado)",
+                            "3.9 Levantarse de una silla (Pararse sin usar apoyos con brazos cruzados)",
+                            "3.10 Postura corporal (Inclinación antero-posterior o asimetría lateral)",
+                            "3.11 Marcha (Fluidez, pasos cortos shuffling, braceo ausente y giros)",
+                            "3.12 Estabilidad postural (Pull Test - respuesta refleja de recuperación al empuje)",
+                            "3.13 Espontaneidad global (Bradicinesia generalizada de movimientos automáticos)",
+                            "3.17 Temblor de reposo (Amplitud máxima en reposo en cara o extremidades)"
                         )
                         items(tasks.size) { index ->
                             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -2630,6 +2962,62 @@ fun TabCalculadoras(
                                                 Text(score.toString(), style = MaterialTheme.typography.labelSmall)
                                             }
                                         }
+                                    }
+                                    val currentScore = updrsSelections[index + 1] ?: 0
+                                    val desc = getUpdrsItemDescription(index + 1, currentScore)
+                                    if (desc.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "webster" -> {
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("Escala de Webster para Parkinson", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Puntuación clínica clásica de 10 ítems (de 0 a 3) para evaluar rigidez, bradicinesia, deambulación, y autocuidado.", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                        val websterTasks = listOf(
+                            "1. Bradicinesia general (retraso en actividades motoras)",
+                            "2. Rigidez pasiva (evaluación de articulaciones grandes)",
+                            "3. Postura y alineación corporal general",
+                            "4. Balanceo de brazos (braceo al marchar bilateral)",
+                            "5. Marcha, deambulación y giros",
+                            "6. Temblor de reposo (amplitud y constancia)",
+                            "7. Facies y frecuencia de parpadeo espontáneo",
+                            "8. Presencia de seborrea en frente/rostro",
+                            "9. Habla, lenguaje y modulación de la voz",
+                            "10. Autocuidado e independencia personal al vestirse/asearse"
+                        )
+                        items(websterTasks.size) { index ->
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(websterTasks[index], style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        (0..3).forEach { score ->
+                                            val isSel = websterSelections[index + 1] == score
+                                            Button(
+                                                onClick = { websterSelections[index + 1] = score },
+                                                colors = ButtonDefaults.buttonColors(containerColor = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant),
+                                                modifier = Modifier.weight(1f),
+                                                contentPadding = PaddingValues(0.dp)
+                                            ) {
+                                                Text(score.toString(), style = MaterialTheme.typography.labelSmall)
+                                            }
+                                        }
+                                    }
+                                    val currentScore = websterSelections[index + 1] ?: 0
+                                    val desc = getWebsterItemDescription(index + 1, currentScore)
+                                    if (desc.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                                     }
                                 }
                             }
@@ -2659,6 +3047,41 @@ fun TabCalculadoras(
                             val isSel = hoehnYahrSelected == grade
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { hoehnYahrSelected = grade },
+                                colors = CardDefaults.cardColors(containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
+                                border = if (isSel) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+                            ) {
+                                Text(desc, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(14.dp), fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                    }
+                    "schwab" -> {
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("Escala de Schwab & England ADL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Evaluación del porcentaje de independencia funcional del paciente con enfermedad de Parkinson. Complemento idóneo para UPDRS y Hoehn & Yahr.", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                        val stages = listOf(
+                            Pair(100, "100% - Completamente independiente\nCapaz de realizar todas las tareas sin lentitud ni dificultad. Esencialmente normal. No es consciente de ninguna dificultad."),
+                            Pair(90, "90% - Completamente independiente\nCapaz de realizar todas las tareas con cierto grado de lentitud, dificultad o vacilación. Toma el doble de tiempo."),
+                            Pair(80, "80% - Completamente independiente en la mayoría de las tareas\nToma el doble de tiempo. Completamente consciente de la dificultad y lentitud."),
+                            Pair(70, "70% - Independencia incompleta\nMayor dificultad en algunas tareas diarias. Pasa una gran parte del día ocupado en ellas."),
+                            Pair(60, "60% - Cierta dependencia\nRealiza la mayoría de las tareas pero muy lentamente y con gran esfuerzo. Comete errores; algunas son imposibles."),
+                            Pair(50, "50% - Dependencia moderada\nRequiere ayuda para la mitad de las tareas cotidianas. Todo es extremadamente lento y difícil para el paciente."),
+                            Pair(40, "40% - Muy dependiente\nPrecisa asistencia casi constante; solo puede colaborar de forma pasiva en pocas funciones."),
+                            Pair(30, "30% - Dependencia severa\nCon mucho esfuerzo puede iniciar o realizar alguna tarea aislada de forma ocasional. Requiere ayuda total."),
+                            Pair(20, "20% - Invalidez grave\nNo realiza nada de forma autónoma. Solo puede cooperar mínimamente en pequeñas tareas con ayuda."),
+                            Pair(10, "10% - Totalmente dependiente / Indefenso\nInvalidez completa. Requiere cuidados constantes de enfermería o familiares."),
+                            Pair(0, "0% - Estado vegetativo / Postrado en cama\nAusencia completa de autonomía, preservándose solo funciones vegetativas básicas.")
+                        )
+                        items(stages.size) { index ->
+                            val (pct, desc) = stages[index]
+                            val isSel = schwabSelected == pct
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { schwabSelected = pct },
                                 colors = CardDefaults.cardColors(containerColor = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
                                 border = if (isSel) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
                             ) {
@@ -4415,25 +4838,60 @@ fun TabCalculadoras(
                     val total = updrsSelections.values.sum()
 
                     StickyResultBar(
-                        scoreText = "Puntaje Motor (Tasks 3.4-3.6): $total puntos",
-                        interpretationText = "Metrónomo activo: ${if(metronomeActive)"Sí ($metronomeHz Hz)" else "No"}",
+                        scoreText = "MDS-UPDRS Parte III: $total / 56 puntos",
+                        interpretationText = "Examen Motor Guiado con Metrónomo (BPM: ${if (metronomeActive) metronomeBpm else 0}).",
                         onResetClicked = {
                             updrsSelections.clear()
-                            (1..3).forEach { updrsSelections[it] = 0 }
+                            (1..14).forEach { updrsSelections[it] = 0 }
                             metronomeActive = false
                         },
-                        missingItemsCount = 3 - updrsSelections.size,
+                        missingItemsCount = 14 - updrsSelections.size,
                         onCopyClicked = {
-                            val breakdown = listOf(
-                                "Finger Tapping score: ${updrsSelections[1]}",
-                                "Movimientos rápidos manos score: ${updrsSelections[2]}",
-                                "Pronación-supinación manos score: ${updrsSelections[3]}"
+                            val updrsNames = listOf(
+                                "3.1 Habla", "3.2 Expresión Facial", "3.3 Rigidez",
+                                "3.4 Finger Tapping", "3.5 Movimientos Manos", "3.6 Pronación/Supinación",
+                                "3.7 Toe Tapping", "3.8 Agilidad Piernas", "3.9 Alzarse de Silla",
+                                "3.10 Postura", "3.11 Marcha", "3.12 Estabilidad Postural",
+                                "3.13 Bradicinesia general", "3.17 Temblor de reposo"
                             )
+                            val breakdown = (1..14).map { "${updrsNames[it - 1]}: ${updrsSelections[it]}" }
                             onCopyClicked(
-                                "MDS-UPDRS Parte III Subset Motor",
-                                "$total puntos de 12 posibles",
+                                "MDS-UPDRS Parte III Examen Motor Decisivo",
+                                "$total / 56 puntos",
                                 breakdown,
-                                "Evaluación simplificada para bradicinesia motora guiada con metrónomo."
+                                "Evaluación clínica de rigidez, temblor y bradicinesia motora utilizando metrónomo de marcha calibrada."
+                            )
+                        }
+                    )
+                }
+                "webster" -> {
+                    val total = websterSelections.values.sum()
+                    val interp = when {
+                        total == 0 -> "Normal / Sin afectación aparente"
+                        total in 1..10 -> "Incapacidad leve o inicial (Sintomatología menor)"
+                        total in 11..20 -> "Incapacidad moderada (Limitaciones obvias en actividades diarias)"
+                        else -> "Incapacidad severa (Paciente altamente dependiente)"
+                    }
+
+                    StickyResultBar(
+                        scoreText = "Webster Parkinson: $total / 30",
+                        interpretationText = interp,
+                        onResetClicked = {
+                            websterSelections.clear()
+                            (1..10).forEach { websterSelections[it] = 0 }
+                        },
+                        missingItemsCount = 10 - websterSelections.size,
+                        onCopyClicked = {
+                            val websterNames = listOf(
+                                "Bradicinesia", "Rigidez", "Postura", "Balanceo de brazos",
+                                "Marcha y giros", "Temblor", "Facies", "Seborrea", "Habla", "Autocuidado"
+                            )
+                            val breakdown = (1..10).map { "${websterNames[it - 1]}: ${websterSelections[it]}" }
+                            onCopyClicked(
+                                "Escala de Webster para Parkinson",
+                                "$total / 30 puntos (Grado: $interp)",
+                                breakdown,
+                                "Evaluación de repercusión funcional y gravedad clínica global del paciente."
                             )
                         }
                     )
@@ -4453,6 +4911,41 @@ fun TabCalculadoras(
                                 listOf("Califica la disfuncionalidad motora, afectación simétrica e inestabilidad postural en Parkinson."),
                                 "Fase de la enfermedad: Estadío $grade de 5.0"
                             )
+                        }
+                    )
+                }
+                "schwab" -> {
+                    val score = schwabSelected
+                    val scoreText = if (score != null) "$score% de independencia" else "No seleccionado"
+                    val interpretation = when (score) {
+                        null -> "Seleccione el porcentaje de la escala."
+                        100 -> "Totalmente independiente. Capaz de realizar todas las tareas sin lentitud ni dificultad."
+                        90 -> "Completamente independiente. Capaz de realizar todas las tareas con cierta lentitud o vacilación."
+                        80 -> "Completamente independiente en la mayoría de las tareas. Le toma el doble de tiempo."
+                        70 -> "Independencia incompleta. Pasa una gran parte del día ocupado en las tareas."
+                        60 -> "Cierta dependencia. Puede realizar la mayoría de las tareas pero de forma lenta y con mucho esfuerzo."
+                        50 -> "Dependencia moderada. Necesita ayuda para la mitad de las tareas cotidianas."
+                        40 -> "Muy dependiente. Precisa asistencia casi constante; solo colabora pasivamente."
+                        30 -> "Dependencia severa. Requiere ayuda total; con esfuerzo inicia o realiza tareas aisladas."
+                        20, 10 -> "Invalidez grave a completa. Totalmente dependiente; no realiza nada de forma autónoma."
+                        0 -> "Estado vegetativo / Postrado en cama. Solo preservación de funciones vegetativas básicas."
+                        else -> ""
+                    }
+
+                    StickyResultBar(
+                        scoreText = "Schwab & England ADL: $scoreText",
+                        interpretationText = interpretation,
+                        onResetClicked = { schwabSelected = null },
+                        missingItemsCount = if (schwabSelected == null) 1 else 0,
+                        onCopyClicked = {
+                            if (score != null) {
+                                onCopyClicked(
+                                    "Escala de Actividades de la Vida Diaria de Schwab & England",
+                                    "$score% Independencia Funcional",
+                                    listOf(interpretation),
+                                    "Estadificación funcional complementaria en el paciente con Enfermedad de Parkinson."
+                                )
+                            }
                         }
                     )
                 }
@@ -10402,4 +10895,198 @@ data class CranialNerveInfo(
     val howToTest: String,
     val pathology: String
 )
+
+fun getUpdrsItemDescription(itemIndex: Int, score: Int): String {
+    return when (itemIndex) {
+        1 -> when (score) {
+            0 -> "Normal: Habla clara sin afectación."
+            1 -> "Leve: Pérdida mínima de volumen, inflexión o claridad."
+            2 -> "Moderado: Voz monótona, disartria detectable pero totalmente comprensible."
+            3 -> "Grave: Severa disartria, habla difícil de entender."
+            4 -> "Severo: Ininteligible o mudo."
+            else -> ""
+        }
+        2 -> when (score) {
+            0 -> "Normal: Expresión facial normal con parpadeo adecuado."
+            1 -> "Leve: Mínima disminución del parpadeo o vivacidad gestual."
+            2 -> "Moderado: Pérdida obvia de expresión, rostro un tanto inexpresivo."
+            3 -> "Grave: Amimia severa, boca ligeramente abierta gran parte del tiempo."
+            4 -> "Severo: Rostro en máscara, ausencia total de expresión."
+            else -> ""
+        }
+        3 -> when (score) {
+            0 -> "Normal: Tono muscular normal."
+            1 -> "Leve: Rigidez detectable sólo mediante maniobras de activación contralateral."
+            2 -> "Moderado: Rigidez constante de leve a moderada en rango completo de movimiento."
+            3 -> "Grave: Rigidez marcada que dificulta la movilización, conserva rango completo."
+            4 -> "Severo: Rigidez muy severa, rango de movimiento limitado pasivo."
+            else -> ""
+        }
+        4 -> when (score) {
+            0 -> "Normal: ≥15 golpes en 5s con máxima amplitud."
+            1 -> "Leve: Enlentecimiento en frecuencia o disminución de amplitud al final."
+            2 -> "Moderado: Fatiga temprana, enlentecimiento o paradas transitorias."
+            3 -> "Grave: Detenciones largas o vacilación al iniciar el movimiento."
+            4 -> "Severo: Apenas realiza 1-2 golpes, incapacidad de completar la tarea."
+            else -> ""
+        }
+        5 -> when (score) {
+            0 -> "Normal: ≥15 aperturas con máxima velocidad y amplitud."
+            1 -> "Leve: Ligera pérdida de amplitud al final de la secuencia."
+            2 -> "Moderado: Detenciones o pausas breves, fatiga evidente."
+            3 -> "Grave: Detenciones frecuentes o colapso en la amplitud."
+            4 -> "Severo: Incapaz de realizar la tarea."
+            else -> ""
+        }
+        6 -> when (score) {
+            0 -> "Normal: Pronación/supinación rápida y simétrica con brazos extendidos."
+            1 -> "Leve: Enlentecimiento mínimo o pequeña limitación asimétrica."
+            2 -> "Moderado: Disminución de velocidad con paradas cortas de ritmo."
+            3 -> "Grave: Severa irregularidad de ritmo con movimientos muy lentos."
+            4 -> "Severo: Imposible o apenas inicia el giro."
+            else -> ""
+        }
+        7 -> when (score) {
+            0 -> "Normal: Golpeteos rítmicos rápidos con talón apoyado y metatarso."
+            1 -> "Leve: Ligero retraso o fatiga progresiva."
+            2 -> "Moderado: Pausas cortas o pérdida evidente de amplitud."
+            3 -> "Grave: Detenciones frecuentes de movimiento."
+            4 -> "Severo: Incapaz de realizar el movimiento."
+            else -> ""
+        }
+        8 -> when (score) {
+            0 -> "Normal: Levanta y golpea el pie entero rápida y fuertemente ≥15 veces."
+            1 -> "Leve: Enlentecimiento menor o menor altura del golpe al final."
+            2 -> "Moderado: Fatiga temprana, pausas cortas o dificultad para elevar el pie."
+            3 -> "Grave: Movimientos muy lentos con detenciones repetidas."
+            4 -> "Severo: Incapaz de levantar el pie del piso."
+            else -> ""
+        }
+        9 -> when (score) {
+            0 -> "Normal: Se levanta rápido y sin esfuerzo, brazos cruzados."
+            1 -> "Leve: Se levanta lentamente o requiere más de un intento solo con brazos cruzados."
+            2 -> "Moderado: Requiere empujarse usando los brazos en los reposabrazos."
+            3 -> "Grave: Tiende a caer hacia atrás o requiere múltiples intentos empujando."
+            4 -> "Severo: Incapaz de levantarse sin ayuda física externa."
+            else -> ""
+        }
+        10 -> when (score) {
+            0 -> "Normal: Postura erguida fisiológica."
+            1 -> "Leve: Ligero encorvamiento hacia adelante o cifosis leve detectable."
+            2 -> "Moderado: Curvatura cifótica evidente con cabeza inclinada hacia adelante."
+            3 -> "Grave: Flexión anterior severa o inclinación asimétrica."
+            4 -> "Severo: Deformidad postural extrema fija."
+            else -> ""
+        }
+        11 -> when (score) {
+            0 -> "Normal: Camina ágilmente, braceo simétrico bilaterales, giros rápidos."
+            1 -> "Leve: Camina lento, braceo disminuido de forma unilateral."
+            2 -> "Moderado: Falta total de balanceo de brazos bilateral, pasos cortos ocasionales."
+            3 -> "Grave: Pasos muy cortos shuffle, propulsión/retropulsión o freezing transitorio."
+            4 -> "Severo: Requiere silla de ruedas o ayuda constante de terceros."
+            else -> ""
+        }
+        12 -> when (score) {
+            0 -> "Normal: Se recupera con 1 o 2 pasos independientes (Pull Test)."
+            1 -> "Leve: Toma 3 o más pasos hacia atrás pero se recupera de forma autónoma."
+            2 -> "Moderado: Pérdida del equilibrio, caería si el examinador no lo sujeta."
+            3 -> "Grave: Muy inestable, tiende a caer espontáneamente sin empuje."
+            4 -> "Severo: Incapaz de sostenerse de pie sin soporte."
+            else -> ""
+        }
+        13 -> when (score) {
+            0 -> "Normal: Movimientos automáticos fluidos, lenguaje corporal normal."
+            1 -> "Leve: Ligero retraso de gestos o escasez de movimientos automáticos."
+            2 -> "Moderado: Pérdida obvia de lenguaje corporal fluido y expresividad general."
+            3 -> "Grave: Severo enlentecimiento, escasez marcada de movimientos cotidianos."
+            4 -> "Severo: Acinesia casi total, sin movimientos espontáneos."
+            else -> ""
+        }
+        14 -> when (score) {
+            0 -> "Normal: Sin temblor de reposo."
+            1 -> "Leve: Temblor leve (<1 cm) e intermitente bajo estrés o distracción."
+            2 -> "Moderado: Temblor constante de amplitud moderada (1-4 cm) en reposo."
+            3 -> "Grave: Temblor pronunciado (4-10 cm) continuo."
+            4 -> "Severo: Temblor de gran amplitud (>10 cm) continuo y muy incapacitante."
+            else -> ""
+        }
+        else -> ""
+    }
+}
+
+fun getWebsterItemDescription(itemIndex: Int, score: Int): String {
+    return when (itemIndex) {
+        1 -> when (score) {
+            0 -> "0: Bradicinesia ausente, velocidad ejecutiva totalmente normal."
+            1 -> "1: Mínimo retraso. Movimientos fluidos pero algo lentos al examen."
+            2 -> "2: Es lento en realizar la mayoría de las actividades de consulta."
+            3 -> "3: Extremadamente lento. Apenas puede iniciar actividades motoras."
+            else -> ""
+        }
+        2 -> when (score) {
+            0 -> "0: Sin rigidez detectable al examen pasivo."
+            1 -> "1: Leve rigidez. Sólo detectable mediante maniobra de Froment (activación contralateral)."
+            2 -> "2: Rigidez constante de moderada intensidad detectable en reposo pasivo."
+            3 -> "3: Rigidez severa que condiciona limitación dolorosa o espástica del rango pasivo."
+            else -> ""
+        }
+        3 -> when (score) {
+            0 -> "0: Postura normal derecha fisiológica."
+            1 -> "1: Postura comienza a inclinarse hacia adelante. Cabeza ligeramente proyectada."
+            2 -> "2: Moderadamente encorvado. Hombros proyectados y flexión de cuello obvia."
+            3 -> "3: Severamente encorvado con cifosis fija que condiciona inestabilidad."
+            else -> ""
+        }
+        4 -> when (score) {
+            0 -> "0: Balanceo de ambos brazos simétrico al caminar."
+            1 -> "1: Balanceo disminuido visiblemente en al menos un brazo."
+            2 -> "2: Pérdida completa de balanceo unilateral (un brazo rígido al caminar)."
+            3 -> "3: Ausencia total de balanceo bilateral (ambos brazos permanecen rígidos)."
+            else -> ""
+        }
+        5 -> when (score) {
+            0 -> "0: Marcha normal sin dificultad para dar giros."
+            1 -> "1: Marcha un poco lenta. Acorta ligeramente el paso pero es estable."
+            2 -> "2: Marcha con arrastre obvio (shuffling) o propulsión intermitente."
+            3 -> "3: Severa dificultad de marcha. Freezing pronunciado, requiere andador o ayuda."
+            else -> ""
+        }
+        6 -> when (score) {
+            0 -> "0: Sin temblor de reposo detectable."
+            1 -> "1: Temblor leve e intermitente (amplitud < 2.5 cm)."
+            2 -> "2: Temblor moderado constante en manos o extremidades (2.5 a 5 cm)."
+            3 -> "3: Temblor severo, continuo y de gran amplitud (> 5 cm)."
+            else -> ""
+        }
+        7 -> when (score) {
+            0 -> "0: Gesticulación y parpadeo normales y espontáneos."
+            1 -> "1: Leve pérdida de expresión facial y menor frecuencia de parpadeo."
+            2 -> "2: Pérdida obvia de expresión y amimia moderada evidente."
+            3 -> "3: Cara en máscara rígida, mirada ausente, boca semicerrada o abierta."
+            else -> ""
+        }
+        8 -> when (score) {
+            0 -> "0: Sin presencia de seborrea en piel o cuero cabelludo."
+            1 -> "1: Piel ligeramente grasosa o brillante en la frente o pliegues nasales."
+            2 -> "2: Seborrea moderada evidente y frente oleosa."
+            3 -> "3: Seborrea severa diseminada, oleosa y con eccema o descamación cutánea."
+            else -> ""
+        }
+        9 -> when (score) {
+            0 -> "0: Habla clara, volumen normal y articulación idónea."
+            1 -> "1: Tono ligeramente bajo o susurrado. Velocidad alterada leve."
+            2 -> "2: Habla monótona, disártrica o con volumen persistentemente bajo (hipofonía)."
+            3 -> "3: Disartria grave incapacitante. Apenas inteligible."
+            else -> ""
+        }
+        10 -> when (score) {
+            0 -> "0: Independiente para autocuidado ordinario (abotonado, asearse)."
+            1 -> "1: Independiente pero lento en vestirse y alimentarse."
+            2 -> "2: Dificultad marcada para botones, zapatos o aseo. Requiere ayuda parcial."
+            3 -> "3: Totalmente dependiente para vestirse, comer o deambular."
+            else -> ""
+        }
+        else -> ""
+    }
+}
 

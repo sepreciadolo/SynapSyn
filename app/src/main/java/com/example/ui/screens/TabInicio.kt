@@ -1,9 +1,11 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,12 +15,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +42,33 @@ fun TabInicio(
     onClearCalculations: () -> Unit,
     onCopyCalculation: (SavedCalculation) -> Unit
 ) {
+    var showManualDialog by remember { mutableStateOf(false) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "workstation_telemetry")
+    val telemetryPulse by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "active_telemetry"
+    )
+
+    val criticalGuidePulse by infiniteTransition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = EaseInCirc),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "critical_pulse"
+    )
+
+    if (showManualDialog) {
+        AppManualDialog(onDismiss = { showManualDialog = false })
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -58,20 +89,21 @@ fun TabInicio(
                 // Digital active heartbeat status
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .graphicsLayer(alpha = telemetryPulse)
+                            .size(10.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF10B981)) // Mint green active dot
+                            .background(MaterialTheme.colorScheme.secondary) // Mint green active dot
                     )
                     Text(
-                        text = "WORKSTATION BEDSIDE • ONLINE",
+                        text = "ESTACIÓN BEDSIDE CRÍTICA • ONLINE",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                            letterSpacing = 1.2.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
                         )
                     )
                 }
@@ -79,11 +111,11 @@ fun TabInicio(
                 // Data Count pill
                 Surface(
                     shape = RoundedCornerShape(100.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -95,7 +127,7 @@ fun TabInicio(
                         )
                         Text(
                             text = "${savedCalculations.size} Registros",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -126,36 +158,57 @@ fun TabInicio(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color.White.copy(alpha = 0.2f),
-                            modifier = Modifier.size(38.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.MedicalServices,
-                                    contentDescription = "Servicio Médico",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color.White.copy(alpha = 0.2f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.MedicalServices,
+                                        contentDescription = "Servicio Médico",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "SYNAPPSE PLATFORM",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        letterSpacing = 2.sp,
+                                        color = Color.White.copy(alpha = 0.75f),
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                )
+                                Text(
+                                    text = "Asistente Neurológico Bedside",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
                                 )
                             }
                         }
-                        Column {
-                            Text(
-                                text = "SYNAPPSE PLATFORM",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    letterSpacing = 2.sp,
-                                    color = Color.White.copy(alpha = 0.75f),
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            )
-                            Text(
-                                text = "Asistente Neurológico Bedside",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                        
+                        FilledTonalIconButton(
+                            onClick = { showManualDialog = true },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.2f),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.size(38.dp).testTag("button_open_manual_hero")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Ver manual de capacidades",
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -205,6 +258,63 @@ fun TabInicio(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // 2.5. INTERACTIVE MANUAL CTA CARD FOR GUEST/ONBOARDING
+        item {
+            Card(
+                onClick = { showManualDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("shortcut_manual_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.28f)
+                ),
+                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Manual de la Aplicación",
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Manual de Capacidades Clínicas",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = "Presiona aquí para explorar el compendio de herramientas, criterios indexados, guías clínicas e índices avanzados para cuidados bedside.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "Abrir Manual",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -277,9 +387,9 @@ fun TabInicio(
                     .testTag("shortcut_protocols_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f)
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = criticalGuidePulse * 0.4f)
                 ),
-                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
+                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.error.copy(alpha = criticalGuidePulse + 0.15f))
             ) {
                 Row(
                     modifier = Modifier
@@ -667,23 +777,24 @@ fun HomeShortcutCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier
-            .height(130.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        onClick = onClick,
+        modifier = modifier.height(138.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+        ),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = accentColor.copy(alpha = 0.12f),
-                modifier = Modifier.size(34.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -696,19 +807,20 @@ fun HomeShortcutCard(
             }
 
             Column(
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 10.5.sp,
-                        lineHeight = 13.sp
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -726,5 +838,192 @@ private fun formatTimestamp(timestamp: Long): String {
         sdf.format(date)
     } catch (e: Exception) {
         ""
+    }
+}
+
+@Composable
+fun AppManualDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().testTag("close_manual_button")
+            ) {
+                Text("Entendido • Volver al Trabajo")
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(26.dp)
+                )
+                Column {
+                    Text(
+                        text = "Manual de Operación",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Capacidades de SynAppSe",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Bienvenido a SynAppSe. Esta guía interactiva le proporciona un compendio rápido de todas las capacidades clínicas disponibles en su estación de trabajo bedside.",
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 16.sp
+                    )
+                    
+                    ManualFeatureSection(
+                        categoryTitle = "🔬 1. CALCULADORAS CLÍNICAS",
+                        features = listOf(
+                            "NIHSS" to "Puntuación de 0 a 42 puntos para determinar el déficit del paciente en eventos coronarios/ACV.",
+                            "ALSFRS-R (ELA)" to "Escala calificada de Amyotrophic Lateral Sclerosis para evaluar progresión funcional de la motoneurona.",
+                            "QMG" to "Quantitative Myasthenia Gravis Score para calificar severidad de fatiga muscular.",
+                            "ASPECTS & PC-ASPECTS" to "Mapeo topológico interactivo anterior y posterior en TAC simple para calcular extensión de infarto isquémico.",
+                            "FOUR Score" to "Alternativa avanzada a GCS, califica respuesta ocular, motora, de tallo y patrón respiratorio en pacientes intubados.",
+                            "Kurtzke EDSS" to "Escala del Estado de Discapacidad de Esclerosis Múltiple mapeada por sistemas funcionales.",
+                            "ICH Score" to "Calcula mortalidad por hemorragia intracerebral de 0 a 6 puntos, con estimación volumétrica integrada (AxBxC) / 2."
+                        )
+                    )
+
+                    ManualFeatureSection(
+                        categoryTitle = "📋 2. CRITERIOS DIAGNÓSTICOS",
+                        features = listOf(
+                            "Guías Gold Coast" to "Censo interactivo para certificar Esclerosis Lateral Amiotrófica (ELA).",
+                            "Consenso EULAR/ACR" to "Lista de validación combinada de criterios diagnósticos de Miastenia Gravis.",
+                            "Clasificación TOAST" to "Mapeo ágil de los 5 subtipos etiológicos de ACV isquémico.",
+                            "Criterios ILAE 2014" to "Algoritmo de clasificación clínica de crisis epilépticas y epilepsia."
+                        )
+                    )
+
+                    ManualFeatureSection(
+                        categoryTitle = "💊 3. FARMACORREGULACIÓN & DOSIS",
+                        features = listOf(
+                            "Dosificación Crítica" to "Compendio inmediato de Inotrópicos, Anticomiciales, Trombolíticos (Alteplasa/TNK por peso) y Sedoanalgesia.",
+                            "Ajuste Renal & SNC" to "Calculadora de depuración (Cockcroft-Gault) con esquemas preventivos de dosis ajustadas al SNC para medicamentos que cruzan la BHE (Aciclovir, Ceftriaxona, Ampicilina, Meropenem y Cefepima) para prevenir fallos renales o neurotoxicidad (encefalopatía por cefepima)."
+                        )
+                    )
+
+                    ManualFeatureSection(
+                        categoryTitle = "🧭 4. EXPLORACIÓN RÁPIDA BEDSIDE",
+                        features = listOf(
+                            "Dermatomas Interactivos" to "Mapeo sensitivo táctil del cuerpo por niveles segmentarios.",
+                            "Reflejos ROT" to "Guía de interpretación y escala clínica profunda de hiper/arreflexia (0 a 4+).",
+                            "Escalas de Screening" to "Puntuaciones mRS (Rankin), escala FAST (ACV rápido) y clasificación higiénica MGFA."
+                        )
+                    )
+
+                    ManualFeatureSection(
+                        categoryTitle = "🦠 5. NEUROINFECTOLOGÍA AVANZADA",
+                        features = listOf(
+                            "Triage de Meningoencefalitis" to "Predicción interactiva de patógenos comunes, análisis de laboratorio/bioquímica del LCR.",
+                            "Índices de Lab" to "Alineación de criterios diagnósticos de Thwaites y Marais (Meningitis Tuberculosa vs Bacteriana), BMS pediátrico y BM-CASCO en adultos.",
+                            "Presión Cripto & Drenaje" to "Evaluador de presión de apertura y volumen óptimo de PL de goteo terapéutico.",
+                            "Índices de Barrera BHE" to "Cálculo en paralelo de Cociente de Albúmina (Q-Alb) para probar permeabilidad de la Barrera Hematoencefálica e Índice de IgG para constatar la síntesis intratecal activa de anticuerpos (Esclerosis Múltiple, lúes o neuroinflamación crónica)."
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VerifiedUser,
+                            contentDescription = "Validado",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "Calibrado de acuerdo con guías clínicas de la AHA/ASA, AAN y consensos internacionales vigentes (2026).",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        },
+        shape = RoundedCornerShape(24.dp),
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+            .testTag("app_manual_dialog")
+    )
+}
+
+@Composable
+fun ManualFeatureSection(categoryTitle: String, features: List<Pair<String, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = categoryTitle,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                features.forEach { (name, desc) ->
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 13.sp
+                        )
+                    }
+                    if (name != features.last().first) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
