@@ -32,6 +32,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +69,8 @@ fun MainScreen(
     val appDb = remember(context) { AppRoomDatabase.getDatabase(context.applicationContext) }
     val calculationRepository = remember(appDb) { SavedCalculationRepository(appDb.savedCalculationDao()) }
     val savedCalculations by calculationRepository.allCalculations.collectAsState(initial = emptyList())
+    val favoriteRepository = remember(appDb) { UserFavoriteRepository(appDb.userFavoriteDao()) }
+    val favorites by favoriteRepository.allFavorites.collectAsState(initial = emptyList())
 
     // Navigation and search states
     var activeTab by remember { mutableStateOf(0) } // 0: Calculadoras, 1: Criterios, 2: Fármacos, 3: Otras Escalas
@@ -162,26 +167,35 @@ fun MainScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.MedicalServices,
-                                        contentDescription = "Medical System logo",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
                             Text(
-                                text = "SynAppSe",
+                                text = buildAnnotatedString {
+                                    withStyle(
+                                        SpanStyle(
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        append("Syn")
+                                    }
+                                    withStyle(
+                                        SpanStyle(
+                                            fontWeight = FontWeight.Light,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    ) {
+                                        append("App")
+                                    }
+                                    withStyle(
+                                        SpanStyle(
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        append("Se")
+                                    }
+                                },
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = (-0.5).sp,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    letterSpacing = (-0.5).sp
                                 )
                             )
                         }
@@ -238,7 +252,7 @@ fun MainScreen(
                 val navItems = remember {
                     listOf(
                         NavItem(label = "Calcular", icon = Icons.Default.Calculate, logicalIndex = 1),
-                        NavItem(label = "Criterios", icon = Icons.Default.FactCheck, logicalIndex = 2),
+                        NavItem(label = "Protocolos", icon = Icons.Default.Assignment, logicalIndex = 2),
                         NavItem(label = "Inicio", icon = Icons.Default.Home, logicalIndex = 0, isCenter = true),
                         NavItem(label = "Fármacos", icon = Icons.Default.Medication, logicalIndex = 3),
                         NavItem(label = "Exploración", icon = Icons.Default.AccessibilityNew, logicalIndex = 4)
@@ -445,6 +459,7 @@ fun MainScreen(
                 // Regular tabs content
                 when (activeTab) {
                     0 -> TabInicio(
+                        darkTheme = darkTheme,
                         onNavigateToTab = { index -> activeTab = index },
                         onNavigateToDrug = { drugName ->
                             targetDrugFilter = drugName
@@ -457,6 +472,24 @@ fun MainScreen(
                             val textToCopy = formatSmartCopy(calc.scaleName, calc.scoreText, detailsList, calc.interpretation)
                             clipboardManager.setText(AnnotatedString(textToCopy))
                             Toast.makeText(context, "Copiado al portapapeles con éxito", Toast.LENGTH_SHORT).show()
+                        },
+                        favorites = favorites,
+                        onToggleFavorite = { id, label, type ->
+                            scope.launch {
+                                if (favorites.any { it.featureId == id }) {
+                                    favoriteRepository.deleteFavorite(id)
+                                } else {
+                                    favoriteRepository.saveFavorite(UserFavorite(id, label, if (type == "calculator") "Calculadoras" else "Protocolos & Guías", type))
+                                }
+                            }
+                        },
+                        onNavigateToCalculator = { id ->
+                            activeCalculatorId = id
+                            activeTab = 1
+                        },
+                        onNavigateToCriterio = { id ->
+                            activeCriterioId = id
+                            activeTab = 2
                         }
                     )
                     1 -> TabCalculadoras(
@@ -580,7 +613,21 @@ fun MainScreen(
                             }
                         },
                         activeCalculatorId = activeCalculatorId,
-                        onActiveCalculatorIdChanged = { activeCalculatorId = it }
+                        onActiveCalculatorIdChanged = { activeCalculatorId = it },
+                        onNavigateToProtocol = { protoId ->
+                            activeCriterioId = protoId
+                            activeTab = 2 // Switch to TabProtocolos (logicalIndex 2)
+                        },
+                        favorites = favorites,
+                        onToggleFavorite = { id, label, type ->
+                            scope.launch {
+                                if (favorites.any { it.featureId == id }) {
+                                    favoriteRepository.deleteFavorite(id)
+                                } else {
+                                    favoriteRepository.saveFavorite(UserFavorite(id, label, if (type == "calculator") "Calculadoras" else "Protocolos & Guías", type))
+                                }
+                            }
+                        }
                     )
                     2 -> TabCriterios(
                         goldCoastChecklist = goldCoastChecklist,
@@ -594,11 +641,11 @@ fun MainScreen(
                         onCopyClicked = { label, status, breakdown, conclusion ->
                             val textToCopy = formatSmartCopy(label, status, breakdown, conclusion)
                             clipboardManager.setText(AnnotatedString(textToCopy))
-                            Toast.makeText(context, "Criterios copiados con éxito", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Información copiada con éxito", Toast.LENGTH_SHORT).show()
                             scope.launch {
                                 calculationRepository.save(
                                     SavedCalculation(
-                                        scaleId = "criterios_" + label.lowercase().filter { it.isLetter() },
+                                        scaleId = "protocolos_" + label.lowercase().filter { it.isLetter() },
                                         scaleName = label,
                                         scoreText = status,
                                         interpretation = conclusion ?: "",
@@ -608,7 +655,21 @@ fun MainScreen(
                             }
                         },
                         activeCriterioId = activeCriterioId,
-                        onActiveCriterioIdChanged = { activeCriterioId = it }
+                        onActiveCriterioIdChanged = { activeCriterioId = it },
+                        onNavigateToCalculator = { calcId ->
+                            activeCalculatorId = calcId
+                            activeTab = 1 // Switch to TabCalculadoras
+                        },
+                        favorites = favorites,
+                        onToggleFavorite = { id, label, type ->
+                            scope.launch {
+                                if (favorites.any { it.featureId == id }) {
+                                    favoriteRepository.deleteFavorite(id)
+                                } else {
+                                    favoriteRepository.saveFavorite(UserFavorite(id, label, if (type == "calculator") "Calculadoras" else "Protocolos & Guías", type))
+                                }
+                            }
+                        }
                     )
                     3 -> TabFarmacos(
                         filterQuery = targetDrugFilter,
@@ -752,6 +813,104 @@ fun ClinicalSelectorBlock(
     }
 }
 
+private val calculatorPathologyMap = mapOf(
+    "nihss" to "stroke",
+    "aspects" to "stroke",
+    "ich" to "stroke",
+    "four" to "stroke",
+    "dragon" to "stroke",
+    "rabdomiolisis" to "stroke",
+    
+    "select" to "epilepsia",
+    "select_asys" to "epilepsia",
+    "cave" to "epilepsia",
+    "cave2" to "epilepsia",
+    "lane" to "epilepsia",
+    "rise" to "epilepsia",
+    "dias3" to "epilepsia",
+    
+    "edss" to "desmielinizante",
+    
+    "alsfrsr" to "union_neuromuscular",
+    "qmg" to "union_neuromuscular",
+    "mrc_sum" to "union_neuromuscular",
+    "mmt8" to "union_neuromuscular",
+    "egris" to "union_neuromuscular",
+    "megos" to "union_neuromuscular",
+    
+    "ledd" to "movimientos_anormales",
+    "aims" to "movimientos_anormales",
+    "mdsupdrs" to "movimientos_anormales",
+    "webster" to "movimientos_anormales",
+    "hoehn_yahr" to "movimientos_anormales",
+    "toxina" to "movimientos_anormales",
+    "schwab" to "movimientos_anormales",
+    
+    "thwaites" to "neuroinfecto",
+    "lcr" to "neuroinfecto",
+    
+    "hachinski" to "otros",
+    "cdr" to "otros",
+    "gds_reisberg" to "otros",
+    "gds15" to "otros",
+    "four_delirium" to "otros"
+)
+
+private val allCalculators = listOf(
+    Pair("nihss", "NIHSS"),
+    Pair("aspects", "ASPECTS"),
+    Pair("ich", "ICH Score"),
+    Pair("four", "FOUR Score"),
+    Pair("edss", "EDSS"),
+    Pair("alsfrsr", "ALSFRS-R"),
+    Pair("qmg", "QMG"),
+    Pair("dragon", "DRAGON"),
+    Pair("lcr", "LCR Liquido"),
+    Pair("egris", "EGRIS (GBS)"),
+    Pair("megos", "mEGOS (GBS)"),
+    Pair("ledd", "Dosis LEDD"),
+    Pair("aims", "AIMS Escala"),
+    Pair("mdsupdrs", "MDS-UPDRS III"),
+    Pair("webster", "Escala Webster"),
+    Pair("hoehn_yahr", "Hoehn y Yahr"),
+    Pair("schwab", "Schwab & England ADL"),
+    Pair("toxina", "Dilución Toxina"),
+    Pair("hachinski", "Hachinski"),
+    Pair("cdr", "CDR Demencia"),
+    Pair("gds_reisberg", "GDS Reisberg (Alzheimer)"),
+    Pair("gds15", "GDS-15 Depresión"),
+    Pair("four_delirium", "4AT Delirium"),
+    Pair("mrc_sum", "MRC Sum Score"),
+    Pair("mmt8", "MMT-8 Muscular"),
+    Pair("rabdomiolisis", "Rabdomiólisis"),
+    Pair("select", "SeLECT (Epilepsia)"),
+    Pair("select_asys", "SeLECT-ASyS (Epilepsia)"),
+    Pair("cave", "CAVE (Epilepsia)"),
+    Pair("cave2", "CAVE2 (Epilepsia)"),
+    Pair("lane", "LANE (Epilepsia)"),
+    Pair("rise", "RISE (Epilepsia)"),
+    Pair("dias3", "DIAS3 (Epilepsia)"),
+    Pair("thwaites", "Thwaites (TBM)")
+)
+
+private val trombolisisAbsolutes = listOf(
+    "1. Sospecha clínica / diagnóstica de hemorragia subaracnoidea (HSA)",
+    "2. Sangrado interno activo o diátesis hemorrágica activa",
+    "3. Neurocirugía o trauma craneoencefálico grave en últimos 3 meses",
+    "4. Antecedente personal confirmado de hemorragia intracerebral espontánea",
+    "5. Neoplasia intracraneal, malformación arteriovenosa o aneurisma gigante",
+    "6. PA persistente elevada (Sistólica >185 mmHg o Diastólica >110 mmHg) refractaria"
+)
+
+private val trombolisisRelatives = listOf(
+    "7. Síntomas de ACV leves que resuelven espontáneamente de forma rápida",
+    "8. Gestante en periodo de embarazo activo",
+    "9. Convulsiones al inicio del cuadro con déficit neurológico postictal residual",
+    "10. Cirugía mayor o traumatismo grave extracraneal previo en últimos 14 días",
+    "11. Sangrado genitourinario o gastrointestinal activo en últimas 21 días",
+    "12. Infarto de miocardio (IAM) reciente en los últimos 3 meses"
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TabCalculadoras(
@@ -832,7 +991,10 @@ fun TabCalculadoras(
 
     onCopyClicked: (String, String, List<String>, String?) -> Unit,
     activeCalculatorId: String?,
-    onActiveCalculatorIdChanged: (String?) -> Unit
+    onActiveCalculatorIdChanged: (String?) -> Unit,
+    onNavigateToProtocol: (String) -> Unit,
+    favorites: List<UserFavorite> = emptyList(),
+    onToggleFavorite: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val localContext = LocalContext.current
 
@@ -991,88 +1153,10 @@ fun TabCalculadoras(
 
     var selectedPathology by remember { mutableStateOf("todas") }
 
-    val calculatorPathologyMap = mapOf(
-        "nihss" to "stroke",
-        "aspects" to "stroke",
-        "ich" to "stroke",
-        "four" to "stroke",
-        "dragon" to "stroke",
-        "rabdomiolisis" to "stroke",
-        
-        "select" to "epilepsia",
-        "select_asys" to "epilepsia",
-        "cave" to "epilepsia",
-        "cave2" to "epilepsia",
-        "lane" to "epilepsia",
-        "rise" to "epilepsia",
-        "dias3" to "epilepsia",
-        
-        "edss" to "desmielinizante",
-        
-        "alsfrsr" to "union_neuromuscular",
-        "qmg" to "union_neuromuscular",
-        "mrc_sum" to "union_neuromuscular",
-        "mmt8" to "union_neuromuscular",
-        "egris" to "union_neuromuscular",
-        "megos" to "union_neuromuscular",
-        
-        "ledd" to "movimientos_anormales",
-        "aims" to "movimientos_anormales",
-        "mdsupdrs" to "movimientos_anormales",
-        "webster" to "movimientos_anormales",
-        "hoehn_yahr" to "movimientos_anormales",
-        "toxina" to "movimientos_anormales",
-        "schwab" to "movimientos_anormales",
-        
-        "thwaites" to "neuroinfecto",
-        "lcr" to "neuroinfecto",
-        
-        "hachinski" to "otros",
-        "cdr" to "otros",
-        "gds_reisberg" to "otros",
-        "gds15" to "otros",
-        "four_delirium" to "otros"
-    )
-
-    val allCalculators = listOf(
-        Pair("nihss", "NIHSS"),
-        Pair("aspects", "ASPECTS"),
-        Pair("ich", "ICH Score"),
-        Pair("four", "FOUR Score"),
-        Pair("edss", "EDSS"),
-        Pair("alsfrsr", "ALSFRS-R"),
-        Pair("qmg", "QMG"),
-        Pair("dragon", "DRAGON"),
-        Pair("lcr", "LCR Liquido"),
-        Pair("egris", "EGRIS (GBS)"),
-        Pair("megos", "mEGOS (GBS)"),
-        Pair("ledd", "Dosis LEDD"),
-        Pair("aims", "AIMS Escala"),
-        Pair("mdsupdrs", "MDS-UPDRS III"),
-        Pair("webster", "Escala Webster"),
-        Pair("hoehn_yahr", "Hoehn y Yahr"),
-        Pair("schwab", "Schwab & England ADL"),
-        Pair("toxina", "Dilución Toxina"),
-        Pair("hachinski", "Hachinski"),
-        Pair("cdr", "CDR Demencia"),
-        Pair("gds_reisberg", "GDS Reisberg (Alzheimer)"),
-        Pair("gds15", "GDS-15 Depresión"),
-        Pair("four_delirium", "4AT Delirium"),
-        Pair("mrc_sum", "MRC Sum Score"),
-        Pair("mmt8", "MMT-8 Muscular"),
-        Pair("rabdomiolisis", "Rabdomiólisis"),
-        Pair("select", "SeLECT (Epilepsia)"),
-        Pair("select_asys", "SeLECT-ASyS (Epilepsia)"),
-        Pair("cave", "CAVE (Epilepsia)"),
-        Pair("cave2", "CAVE2 (Epilepsia)"),
-        Pair("lane", "LANE (Epilepsia)"),
-        Pair("rise", "RISE (Epilepsia)"),
-        Pair("dias3", "DIAS3 (Epilepsia)"),
-        Pair("thwaites", "Thwaites (TBM)")
-    )
-
-    val filteredCalculators = allCalculators.filter { (id, _) ->
-        selectedPathology == "todas" || calculatorPathologyMap[id] == selectedPathology
+    val filteredCalculators = remember(selectedPathology) {
+        allCalculators.filter { (id, _) ->
+            selectedPathology == "todas" || calculatorPathologyMap[id] == selectedPathology
+        }
     }
 
     var searchQueryCalculadoras by remember { mutableStateOf("") }
@@ -1109,9 +1193,11 @@ fun TabCalculadoras(
 
                 if (searchQueryCalculadoras.isNotEmpty()) {
                     // Match Results View
-                    val results = allCalculators.filter {
-                        it.second.contains(searchQueryCalculadoras, ignoreCase = true) ||
-                        it.first.contains(searchQueryCalculadoras, ignoreCase = true)
+                    val results = remember(searchQueryCalculadoras) {
+                        allCalculators.filter {
+                            it.second.contains(searchQueryCalculadoras, ignoreCase = true) ||
+                            it.first.contains(searchQueryCalculadoras, ignoreCase = true)
+                        }
                     }
 
                     if (results.isEmpty()) {
@@ -1202,15 +1288,17 @@ fun TabCalculadoras(
                     }
                 } else if (selectedPathology == "todas") {
                     // MAIN DIRECTORIES LAYOUT
-                    val directoryCategories = listOf(
-                        Triple("stroke", "Ictus, Vascular & Triage", "NIHSS, ASPECTS, ICH, FOUR, DRAGON, Rabdomiólisis"),
-                        Triple("epilepsia", "Epilepsia & Crisis Agudas", "SeLECT, SeLECT-ASyS, CAVE, CAVE2, LANE, RISE, DIAS3"),
-                        Triple("desmielinizante", "Neuroinmunología / EDSS", "Línea temporal y nivel de discapacidad (EDSS)"),
-                        Triple("union_neuromuscular", "Unión Neuromuscular & Miopatías", "ALSFRS-R, QMG, escalas de debilidad segmentaria mEGOS y EGRIS"),
-                        Triple("movimientos_anormales", "Trastornos del Movimiento", "Cálculo de dopamina LEDD, AIMS, MDS-UPDRS, H&Y"),
-                        Triple("neuroinfecto", "Neuroinfección & Lab LCR", "Thwaites, Marais, BM-CASCO, índices de LCR (IgG/Q-Alb) y ajuste renal de dosis"),
-                        Triple("otros", "Cognitivo, Delirium y Depresión", "Criterios Hachinski, CDR Clínico, GDS-15, Triage 4AT")
-                    )
+                    val directoryCategories = remember {
+                        listOf(
+                            Triple("stroke", "Ictus, Vascular & Triage", "NIHSS, ASPECTS, ICH, FOUR, DRAGON, Rabdomiólisis"),
+                            Triple("epilepsia", "Epilepsia & Crisis Agudas", "SeLECT, SeLECT-ASyS, CAVE, CAVE2, LANE, RISE, DIAS3"),
+                            Triple("desmielinizante", "Neuroinmunología / EDSS", "Línea temporal y nivel de discapacidad (EDSS)"),
+                            Triple("union_neuromuscular", "Unión Neuromuscular & Miopatías", "ALSFRS-R, QMG, escalas de debilidad segmentaria mEGOS y EGRIS"),
+                            Triple("movimientos_anormales", "Trastornos del Movimiento", "Cálculo de dopamina LEDD, AIMS, MDS-UPDRS, H&Y"),
+                            Triple("neuroinfecto", "Neuroinfección & Lab LCR", "Thwaites, Marais, BM-CASCO, índices de LCR (IgG/Q-Alb) y ajuste renal de dosis"),
+                            Triple("otros", "Cognitivo, Delirium y Depresión", "Criterios Hachinski, CDR Clínico, GDS-15, Triage 4AT")
+                        )
+                    }
 
                     val calculatorCounts = remember {
                         calculatorPathologyMap.values.groupingBy { it }.eachCount()
@@ -1396,6 +1484,24 @@ fun TabCalculadoras(
                         )
                     }
 
+                    val relatedProtocols = when (selectedPathology) {
+                        "stroke" -> listOf(
+                            Pair("trombolisis", "Trombólisis (ACV)"),
+                            Pair("toast", "Clasificación TOAST (ACV)")
+                        )
+                        "union_neuromuscular" -> listOf(
+                            Pair("gold_coast_als", "Criterios Gold Coast (ELA)"),
+                            Pair("miopatias_eular", "Miopatías Inflamatorias (EULAR/ACR)")
+                        )
+                        "epilepsia" -> listOf(
+                            Pair("ilae_epilepsy", "Clasificación de Epilepsias ILAE")
+                        )
+                        "otros" -> listOf(
+                            Pair("alzheimer_ea", "Trastorno Neurocognitivo Mayor Alzheimer (GDS)")
+                        )
+                        else -> emptyList()
+                    }
+
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
@@ -1403,6 +1509,81 @@ fun TabCalculadoras(
                         contentPadding = PaddingValues(bottom = 200.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        if (relatedProtocols.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Protocolos Clínicos Relacionados",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
+                            items(relatedProtocols.size) { index ->
+                                val (protoId, protoTitle) = relatedProtocols[index]
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onNavigateToProtocol(protoId) },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Assignment,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = protoTitle,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                                Text(
+                                                    text = "Ver protocolo y criterios interactivos",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                            contentDescription = "Abrir protocolo",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Calculadoras y Escalas",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
+                        }
+
                         items(subPathologyList) { (id, label) ->
                             val descStr = when (id) {
                                 "nihss" -> "Escala neurológica cuantitativa para evaluar la gravedad de un ictus isquémico agudo."
@@ -1482,6 +1663,7 @@ fun TabCalculadoras(
                 
                 Row(
                     modifier = Modifier
+                        .statusBarsPadding()
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -1507,6 +1689,23 @@ fun TabCalculadoras(
                             text = "Formulario de Evaluación de Paciente",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    val isFav = favorites.any { it.featureId == activeCalculatorId }
+                    IconButton(
+                        onClick = {
+                            val activeId = activeCalculatorId
+                            if (activeId != null) {
+                                onToggleFavorite(activeId, activeCalcLabel, "calculator")
+                            }
+                        },
+                        modifier = Modifier.testTag("calculator_favorite_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = if (isFav) "Quitar de favoritos" else "Añadir a favoritos",
+                            tint = if (isFav) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -5874,16 +6073,81 @@ data class CriterioVisualAttrs(
     val accentColor: Color
 )
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SuggestedCalculatorsRow(
+    calculators: List<Pair<String, String>>,
+    onNavigateToCalculator: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Calculate,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Calculadoras de Interés Correlativas",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                calculators.forEach { (scaleId, scaleName) ->
+                    SuggestionChip(
+                        onClick = { onNavigateToCalculator(scaleId) },
+                        label = {
+                            Text(
+                                text = scaleName,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TabCriterios(
-    goldCoastChecklist: Map<Int, Boolean>,
-    trombolisisChecklist: Map<Int, Boolean>,
+    goldCoastChecklist: MutableMap<Int, Boolean>,
+    trombolisisChecklist: MutableMap<Int, Boolean>,
     selectedToastType: Int?,
     onToastTypeSelected: (Int?) -> Unit,
     onNavigateToDrug: (String) -> Unit,
     onCopyClicked: (String, String, List<String>, String?) -> Unit,
     activeCriterioId: String?,
-    onActiveCriterioIdChanged: (String?) -> Unit
+    onActiveCriterioIdChanged: (String?) -> Unit,
+    onNavigateToCalculator: ((String) -> Unit)? = null,
+    favorites: List<UserFavorite> = emptyList(),
+    onToggleFavorite: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var searchQueryCriterios by remember { mutableStateOf("") }
@@ -5898,13 +6162,16 @@ fun TabCriterios(
     val alzheimerChecklistMap = remember { mutableStateMapOf<Int, Boolean>() }
     var selectedGdsStage by remember { mutableStateOf(1) }
 
+    // Trombólisis Collapse States
+    var trombolisisAbsolutesExpanded by remember { mutableStateOf(true) }
+    var trombolisisRelativesExpanded by remember { mutableStateOf(false) }
+
     val allCriteria = remember {
         listOf(
             Triple("trombolisis", "Trombólisis (ACV)", "Checklist de contraindicaciones absolutas y relativas para infusión de Alteplasa / Tenecteplasa."),
             Triple("gold_coast_als", "Gold Coast (ELA)", "Criterios simplificados de Gold Coast 2020 para el diagnóstico de Esclerosis Lateral Amiotrófica."),
             Triple("alzheimer_ea", "Alzheimer - TNM debido a EA", "Directrices clínicas, sospecha, estudios de extensión, diagnósticos diferenciales y estadificación de la progresión funcional mediante la escala de Deterioro Global (GDS)."),
             Triple("miopatias_eular", "Miopatías (EULAR/ACR)", "Clasificaciones de Miopatías Inflamatorias Idiopáticas EULAR/ACR 2017."),
-            Triple("toast", "TOAST (ACV)", "Clasificación etiológica del subtipo de ACV isquémico agudo."),
             Triple("ilae_epilepsy", "Epilepsia (ILAE)", "Clasificación operacional oficial de crisis epilépticas y tipos de epilepsias.")
         )
     }
@@ -5925,14 +6192,14 @@ fun TabCriterios(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Criterios Clínicos & Diagnósticos",
+                        text = "Protocolos & Guías Clínicas",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Valide criterios de exclusión, clasificaciones oficiales y checklists de soporte médico.",
+                        text = "Valide checklists de exclusión, clasificaciones oficiales y protocolos de soporte médico.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -5943,7 +6210,7 @@ fun TabCriterios(
             OutlinedTextField(
                 value = searchQueryCriterios,
                 onValueChange = { searchQueryCriterios = it },
-                placeholder = { Text("Buscar criterio (e.g. Trombólisis, TOAST, ELA)...") },
+                placeholder = { Text("Buscar protocolo o guía (e.g. Trombólisis, TOAST, ELA)...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
                 trailingIcon = {
                     if (searchQueryCriterios.isNotEmpty()) {
@@ -5988,7 +6255,7 @@ fun TabCriterios(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "No se encontraron criterios médicos con:",
+                        text = "No se encontraron protocolos médicos con:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -6013,7 +6280,6 @@ fun TabCriterios(
                             "gold_coast_als" -> CriterioVisualAttrs("MIO/ELA/DEM", Color(0xFFF3E8FF), Color(0xFF6B21A8), Icons.Default.Accessibility, Color(0xFF8B5CF6))
                             "alzheimer_ea" -> CriterioVisualAttrs("COGNICION/DEM", Color(0xFFE0F2FE), Color(0xFF0369A1), Icons.Default.Psychology, Color(0xFF0284C7))
                             "miopatias_eular" -> CriterioVisualAttrs("MIO/ELA/DEM", Color(0xFFE6FFFA), Color(0xFF0D9488), Icons.Default.FactCheck, Color(0xFF00897B))
-                            "toast" -> CriterioVisualAttrs("ACV / ICTUS", Color(0xFFEBF5FF), Color(0xFF1E40AF), Icons.Default.ListAlt, Color(0xFF3B82F6))
                             else -> CriterioVisualAttrs("EPILEPSIA", Color(0xFFFEF3C7), Color(0xFF92400E), Icons.Default.Bolt, Color(0xFFFFB300))
                         }
 
@@ -6096,28 +6362,52 @@ fun TabCriterios(
             // Header with Back button
             Row(
                 modifier = Modifier
+                    .statusBarsPadding()
                     .fillMaxWidth()
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { onActiveCriterioIdChanged(null) },
-                    modifier = Modifier.testTag("criteria_back_button")
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Volver al catálogo",
-                        tint = MaterialTheme.colorScheme.primary
+                    IconButton(
+                        onClick = { onActiveCriterioIdChanged(null) },
+                        modifier = Modifier.testTag("criteria_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Volver al catálogo",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Volver al catálogo",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { onActiveCriterioIdChanged(null) }
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Volver al catálogo",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onActiveCriterioIdChanged(null) }
-                )
+
+                val isFav = favorites.any { it.featureId == activeCriterioId }
+                val activeCriterioLabel = allCriteria.find { it.first == activeCriterioId }?.second ?: (activeCriterioId ?: "")
+                IconButton(
+                    onClick = {
+                        val activeId = activeCriterioId
+                        if (activeId != null) {
+                            onToggleFavorite(activeId, activeCriterioLabel, "criterio")
+                        }
+                    },
+                    modifier = Modifier.testTag("criteria_favorite_button")
+                ) {
+                    Icon(
+                        imageVector = if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = if (isFav) "Quitar de favoritos" else "Añadir a favoritos",
+                        tint = if (isFav) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             LazyColumn(
@@ -6127,27 +6417,10 @@ fun TabCriterios(
             ) {
                 when (activeCriterioId) {
                     "trombolisis" -> {
-                        val absolutes = listOf(
-                            "1. Sospecha clínica / diagnóstica de hemorragia subaracnoidea (HSA)",
-                            "2. Sangrado interno activo o diátesis hemorrágica activa",
-                            "3. Neurocirugía o trauma craneoencefálico grave en últimos 3 meses",
-                            "4. Antecedente personal confirmado de hemorragia intracerebral espontánea",
-                            "5. Neoplasia intracraneal, malformación arteriovenosa o aneurisma gigante",
-                            "6. PA persistente elevada (Sistólica >185 mmHg o Diastólica >110 mmHg) refractaria"
-                        )
-                        val relatives = listOf(
-                            "7. Síntomas de ACV leves que resuelven espontáneamente de forma rápida",
-                            "8. Gestante en periodo de embarazo activo",
-                            "9. Convulsiones al inicio del cuadro con déficit neurológico postictal residual",
-                            "10. Cirugía mayor o traumatismo grave extracraneal previo en últimos 14 días",
-                            "11. Sangrado genitourinario o gastrointestinal activo en últimas 21 días",
-                            "12. Infarto de miocardio (IAM) reciente en los últimos 3 meses"
-                        )
+                        val itemTrombolisisMap = trombolisisChecklist
 
-                        val itemTrombolisisMap = trombolisisChecklist as MutableMap
-
-                        val countsAbsolute = absolutes.indices.count { itemTrombolisisMap[it] == true }
-                        val countsRelative = relatives.indices.count { itemTrombolisisMap[100 + it] == true }
+                        val countsAbsolute = trombolisisAbsolutes.indices.count { itemTrombolisisMap[it] == true }
+                        val countsRelative = trombolisisRelatives.indices.count { itemTrombolisisMap[100 + it] == true }
 
                         val statusText: String
                         val statusDesc: String
@@ -6162,16 +6435,16 @@ fun TabCriterios(
                                 statusBgColor = colorScheme.errorContainer.copy(alpha = 0.22f)
                             }
                             countsRelative > 0 -> {
-                                statusText = "EVALUAR RIESGO/BENEFICIO (PRECAUCIÓN)"
-                                statusDesc = "Contraindicación relativa detectada. Se sugiere interconsulta con neurólogo, evaluar extensión y beneficio potencial de reperfusión."
-                                statusColor = Color(0xFFE6A23C)
-                                statusBgColor = Color(0xFFFDF6EC)
+                                statusText = "EVALUAR RIESGO / BENEFICIO"
+                                statusDesc = "CONTRAINDICACIÓN RELATIVA detectada. Sopesar individualmente el riesgo/beneficio clínico de la reperfusión."
+                                statusColor = Color(0xFFD97706) // Amber / Warning
+                                statusBgColor = Color(0xFFFEF3C7) // Amber light background
                             }
                             else -> {
                                 statusText = "CANDIDATO APTO"
-                                statusDesc = "Sin contraindicaciones absolutas ni relativas detectadas. Proceder con protocolo de infusión estándar de urgencias."
-                                statusColor = colorScheme.primary
-                                statusBgColor = colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                statusDesc = "Sin contraindicaciones absolutas ni relativas detectadas. Proceder según protocolo de reperfusión."
+                                statusColor = Color(0xFF10B981) // Green / Success
+                                statusBgColor = Color(0xFFD1FAE5) // Green light background
                             }
                         }
 
@@ -6195,6 +6468,17 @@ fun TabCriterios(
                                     )
                                 }
                             }
+                        }
+
+                        item {
+                            SuggestedCalculatorsRow(
+                                calculators = listOf(
+                                    "nihss" to "NIHSS (Severidad)",
+                                    "aspects" to "ASPECTS (Radiología)",
+                                    "dragon" to "DRAGON (Pronóstico ACV)"
+                                ),
+                                onNavigateToCalculator = { onNavigateToCalculator?.invoke(it) }
+                            )
                         }
 
                         item {
@@ -6242,12 +6526,12 @@ fun TabCriterios(
                                         }
                                         Button(
                                             onClick = {
-                                                val absoluteMatches = absolutes.filterIndexed { index, _ -> itemTrombolisisMap[index] == true }
-                                                val relativeMatches = relatives.filterIndexed { index, _ -> itemTrombolisisMap[100 + index] == true }
+                                                val absoluteMatches = trombolisisAbsolutes.filterIndexed { index, _ -> itemTrombolisisMap[index] == true }
+                                                val relativeMatches = trombolisisRelatives.filterIndexed { index, _ -> itemTrombolisisMap[100 + index] == true }
                                                 val matchedString = mutableListOf<String>()
                                                 matchedString.add("Absolutas detectadas: " + if (absoluteMatches.isEmpty()) "Ninguna" else absoluteMatches.joinToString("; "))
                                                 matchedString.add("Relativas detectadas: " + if (relativeMatches.isEmpty()) "Ninguna" else relativeMatches.joinToString("; "))
-
+ 
                                                 onCopyClicked(
                                                     "Checklist Trombólisis",
                                                     statusText,
@@ -6265,72 +6549,154 @@ fun TabCriterios(
                                 }
                             }
                         }
-
+ 
                         item {
-                            Text(
-                                text = "Contraindicaciones Absolutas (Hacer chequeo obligatorio):",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        items(absolutes.size) { index ->
-                            val text = absolutes[index]
-                            val isChecked = itemTrombolisisMap[index] == true
-                            Row(
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { itemTrombolisisMap[index] = !isChecked }
-                                    .background(
-                                        if (isChecked) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                                        else MaterialTheme.colorScheme.surface,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { itemTrombolisisMap[index] = it },
-                                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.error)
+                                    .clickable { trombolisisAbsolutesExpanded = !trombolisisAbsolutesExpanded }
+                                    .testTag("toggle_absolutes_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Contraindicaciones Absolutas",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                        Text(
+                                            text = "Obligatorias • ${countsAbsolute} de ${trombolisisAbsolutes.size} detectadas",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (trombolisisAbsolutesExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Expandir/Colapsar",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
-
-                        item {
-                            Text(
-                                text = "Contraindicaciones Relativas (Evaluar margen riesgo/beneficio):",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE6A23C)
-                            )
+ 
+                        if (trombolisisAbsolutesExpanded) {
+                            items(trombolisisAbsolutes.size) { index ->
+                                val text = trombolisisAbsolutes[index]
+                                val isChecked = itemTrombolisisMap[index] == true
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { itemTrombolisisMap[index] = !isChecked }
+                                        .background(
+                                            if (isChecked) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                                            else MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isChecked) MaterialTheme.colorScheme.error.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isChecked,
+                                        onCheckedChange = { itemTrombolisisMap[index] = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.error)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                }
+                            }
                         }
-
-                        items(relatives.size) { index ->
-                            val text = relatives[index]
-                            val isChecked = itemTrombolisisMap[100 + index] == true
-                            Row(
+ 
+                        item {
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { itemTrombolisisMap[100 + index] = !isChecked }
-                                    .background(
-                                        if (isChecked) Color(0xFFFDF6EC).copy(alpha = 0.5f)
-                                        else MaterialTheme.colorScheme.surface,
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { itemTrombolisisMap[100 + index] = it },
-                                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFFE6A23C))
+                                    .clickable { trombolisisRelativesExpanded = !trombolisisRelativesExpanded }
+                                    .testTag("toggle_relatives_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    Color(0xFFE6A23C).copy(alpha = 0.3f)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Contraindicaciones Relativas",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFD97706)
+                                        )
+                                        Text(
+                                            text = "Evaluación riesgo/beneficio • ${countsRelative} de ${trombolisisRelatives.size} detectadas",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (trombolisisRelativesExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Expandir/Colapsar",
+                                        tint = Color(0xFFD97706)
+                                    )
+                                }
+                            }
+                        }
+ 
+                        if (trombolisisRelativesExpanded) {
+                            items(trombolisisRelatives.size) { index ->
+                                val text = trombolisisRelatives[index]
+                                val isChecked = itemTrombolisisMap[100 + index] == true
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { itemTrombolisisMap[100 + index] = !isChecked }
+                                        .background(
+                                            if (isChecked) Color(0xFFFEF3C7).copy(alpha = 0.5f)
+                                            else MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isChecked) Color(0xFFF59E0B).copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isChecked,
+                                        onCheckedChange = { itemTrombolisisMap[100 + index] = it },
+                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFFE6A23C))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -6387,6 +6753,15 @@ fun TabCriterios(
                                     )
                                 }
                             }
+                        }
+
+                        item {
+                            SuggestedCalculatorsRow(
+                                calculators = listOf(
+                                    "alsfrsr" to "ALSFRS-R (Funcional ELA)"
+                                ),
+                                onNavigateToCalculator = { onNavigateToCalculator?.invoke(it) }
+                            )
                         }
 
                         // Horizontal Tab Pill Row
@@ -6487,7 +6862,7 @@ fun TabCriterios(
                                         ) {
                                             Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Copia Inteligente")
+                                            Text("Copiar Reporte")
                                         }
                                     }
                                 }
@@ -6510,7 +6885,7 @@ fun TabCriterios(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            (goldCoastChecklist as MutableMap)[index] = !isChecked
+                                            goldCoastChecklist[index] = !isChecked
                                         }
                                         .background(
                                             if (isChecked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -6527,7 +6902,7 @@ fun TabCriterios(
                                 ) {
                                     Checkbox(
                                         checked = isChecked,
-                                        onCheckedChange = { (goldCoastChecklist as MutableMap)[index] = it }
+                                        onCheckedChange = { goldCoastChecklist[index] = it }
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -7045,6 +7420,16 @@ fun TabCriterios(
                                     )
                                 }
                             }
+                        }
+
+                        item {
+                            SuggestedCalculatorsRow(
+                                calculators = listOf(
+                                    "gds_reisberg" to "Deterioro Global (GDS)",
+                                    "cdr" to "Estadificación CDR Demencia"
+                                ),
+                                onNavigateToCalculator = { onNavigateToCalculator?.invoke(it) }
+                            )
                         }
 
                         // Horizontal Tab selection Row
@@ -7764,6 +8149,16 @@ fun TabCriterios(
                         }
 
                         item {
+                            SuggestedCalculatorsRow(
+                                calculators = listOf(
+                                    "mmt8" to "Score MMT-8 muscular",
+                                    "mrc_sum" to "Suma MRC balance muscular"
+                                ),
+                                onNavigateToCalculator = { onNavigateToCalculator?.invoke(it) }
+                            )
+                        }
+
+                        item {
                             Text(
                                 text = "Formas Clínicas Clínicamente Distinguibles:",
                                 style = MaterialTheme.typography.titleMedium,
@@ -7839,90 +8234,6 @@ fun TabCriterios(
                             }
                         }
                     }
-                    "toast" -> {
-                        val criteria = ClinicalDatabase.toastAcv
-                        item {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = criteria.name,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = criteria.description,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                        }
-
-                        item {
-                            Text(
-                                text = "Clasificación Etiológica (Seleccione una para Smart Copy):",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-
-                        val itemsText = criteria.sections[0].items
-                        items(itemsText.size) { index ->
-                            val text = itemsText[index]
-                            val isSelected = selectedToastType == index
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onToastTypeSelected(index) }
-                                    .padding(vertical = 2.dp)
-                                    .testTag("toast_item_$index"),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = { onToastTypeSelected(index) }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = text,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        if (isSelected) {
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Button(
-                                                onClick = {
-                                                    onCopyClicked(
-                                                        "Clasificación Etiológica TOAST",
-                                                        text.substringBefore(":"),
-                                                        listOf(text.substringAfter(":")),
-                                                        "Clasificación de subtipo de ACV isquémico agudo."
-                                                    )
-                                                },
-                                                modifier = Modifier.align(Alignment.End).testTag("copy_toast_selected")
-                                            ) {
-                                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Copia Diagnóstico TOAST")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
                     "ilae_epilepsy" -> {
                         val criteria = ClinicalDatabase.epilepsyClassification
                         item {
@@ -7944,6 +8255,17 @@ fun TabCriterios(
                                     )
                                 }
                             }
+                        }
+
+                        item {
+                            SuggestedCalculatorsRow(
+                                calculators = listOf(
+                                    "select" to "Score SeLECT (Crisis Tardías)",
+                                    "cave" to "Score CAVE (Hemorragia)",
+                                    "lane" to "Score LANE (Ictus Lober)"
+                                ),
+                                onNavigateToCalculator = { onNavigateToCalculator?.invoke(it) }
+                            )
                         }
 
                         items(criteria.sections) { section ->
@@ -9808,6 +10130,7 @@ fun ExamenFisicoCard(
             listOf(
                 "todos" to "Ver Todo",
                 "pares" to "Pares Craneales (I-XII)",
+                "neuro_oftalmo" to "Simuladores Visual/Pupila",
                 "fuerza_reflejos" to "Escalas de Fuerza & Reflejo",
                 "dermatomas" to "Dermatomas",
                 "signos" to "Reflejos/Signos Patológicos"
@@ -10885,6 +11208,851 @@ fun ExamenFisicoCard(
                 }
             }
         }
+
+        if (selectedCategory == "todos" || selectedCategory == "neuro_oftalmo") {
+            NeuroOftalmologiaSimulatorsSection(onCopyClicked = onCopyClicked)
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun NeuroOftalmologiaSimulatorsSection(
+    onCopyClicked: (String, String, String) -> Unit
+) {
+    var selectedVisualFieldOption by remember { mutableStateOf(0) }
+    var lesionSide by remember { mutableStateOf("der") } // "der" = Right PCA lesion -> Left defect, "izq" = Left PCA lesion -> Right defect
+    
+    var selectedPupilOption by remember { mutableStateOf("normal") }
+    var lightStimulus by remember { mutableStateOf("none") } // "none", "left", "right"
+    var nearFocus by remember { mutableStateOf(false) }
+
+    val interpretationText = when (selectedVisualFieldOption) {
+        0 -> "Hemianopsia Homónima contralateral (${if (lesionSide == "der") "Izquierda" else "Derecha"}) con preservación de la visión macular central (Macular Sparing) gracias a circulación colateral de la arteria cerebral media."
+        1 -> "Cuadrantanopsia Superior Contra-lateral (${if (lesionSide == "der") "Izquierda" else "Derecha"}) debido a compromiso de fibras inferiores de la radiación óptica / labio inferior de cisura calcarina (Cuneus inferior)."
+        2 -> "Cuadrantanopsia Superior Contra-lateral (${if (lesionSide == "der") "Izquierda" else "Derecha"}) - Defecto tipo 'Pie en el cielo' (Pie-in-the-sky) debido a isquemia selectiva del lóbulo temporal que afecta las Radiaciones Ópticas de Meyer."
+        3 -> "Cuadrantanopsia Superior Contra-lateral combinada con acromatopsia hemi-campo o distorsión del color por afectación selectiva del Giro Lingual Unilateral lateral (área V4 de la corteza visual)."
+        4 -> "Amaurosis/Ceguera Cortical Bilateral Completa (Síndrome de Anton). Ausencia de percepción de luz bilateral con reflejo pupilar fotomotor conservado debido al origen subcortical intacto del arco pupilar pre-téctico."
+        else -> ""
+    }
+
+    val visualFieldOptions = listOf(
+        "Corteza Calcarina Posterior (V1)" to "Hemianopsia con Preservación Macular",
+        "Cuneus Inferior" to "Cuadrantanopsia Superior Contralateral",
+        "Radiaciones Ópticas (Meyer)" to "Defecto en Cuadrante (\"Pie en el cielo\")",
+        "Giro Lingual Unilateral" to "Cuadrantanopsia Sup + Acromatopsia",
+        "V1 Bilateral Completo" to "Ceguera Cortical (S. Anton)"
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // CARD 1: VISUAL FIELD SIMULATOR
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("visual_field_simulator_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Simulador de Defectos del Campo Visual en Infarto de ACP",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Seleccione un territorio anatómico de la vía visual para simular el patrón de perimetría campimétrica automatizada que predice con precisión la lateralidad del infarto cerebral (96% de correlación perimetría-RM).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+                
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Lesion side selection
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "Lado de Lesión Cerebral (Isquemia):",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("izq" to "Izquierda", "der" to "Derecha").forEach { (side, label) ->
+                                val active = lesionSide == side
+                                FilledTonalButton(
+                                    onClick = { lesionSide = side },
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(32.dp).testTag("lesion_side_$side")
+                                ) {
+                                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // Options list
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        visualFieldOptions.forEachIndexed { index, (title, subtitle) ->
+                            val isSelected = selectedVisualFieldOption == index
+                            Surface(
+                                onClick = { selectedVisualFieldOption = index },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth().testTag("visual_option_$index")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedVisualFieldOption = index }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "${index + 1}. $title",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Display Fields side-by-side
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            VisualFieldVisualizer(
+                                option = selectedVisualFieldOption,
+                                lesionSide = lesionSide,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Text(
+                                text = "Patrón de Perimetría: $interpretationText",
+                                style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp).testTag("perimetry_interpretation")
+                            )
+                        }
+                    }
+
+                    // Display related clinical facts
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Hallazgos Clínicos",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "HALLAZGOS CLÍNICOS RELACIONADOS",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            if (selectedVisualFieldOption == 4) {
+                                Text(
+                                    text = "Ceguera Cortical / Síndrome de Anton:\nLesión bilateral o hipoperfusión occipital severa global. Cursa con pupilas normales (ya que la vía subcortical de reflejos pretectales está intacta). Si asocia anosognosia (negación refractaria de la propia ceguera), se establece el clásico Síndrome de Anton.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    text = "OCT Post-ACV Occipital / Lesión de Vías:\nSemanas o meses después del infarto de arteria cerebral posterior, se detecta atrofia de la capa de células ganglionares macular y un consecuente adelgazamiento peripapilar homónimo bilateral debido a la degeneración retrógrada axonal transináptica clásica de la vía visual posterior.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            Button(
+                                onClick = {
+                                    val title = visualFieldOptions[selectedVisualFieldOption].first
+                                    onCopyClicked(
+                                        "SIMULADOR CAMPO VISUAL (PERIMETRÍA)",
+                                        "Pérdida en Hemi-campos: ${if (lesionSide == "der") "Izquierdo (Lesión ACP Derecha)" else "Derecho (Lesión ACP Izquierda)"}",
+                                        "Territorio: $title\nInterpretación: $interpretationText"
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("copy_visual_perimetry"),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Copiar Perimetría a Portapapeles", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 2: PUPILLARY ANOMALIES SIMULATOR
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("pupillary_simulator_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Simulador Diagnóstico de Anomalías Pupilares",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Identifique los correlatos anatómicos y mecanismos patológicos de los principales hallazgos pupilares post-ACV. Simule estímulo de linterna en cada ojo para comprobar reflejos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val pupilOptions = listOf(
+                    "normal" to "Normal",
+                    "midriasis_uni" to "Midriasis Uni",
+                    "horner" to "S. Horner",
+                    "midriasis_bi" to "Midriasis Bilateral",
+                    "parinaud" to "Parinaud"
+                )
+
+                androidx.compose.foundation.layout.FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    pupilOptions.forEach { (id, label) ->
+                        val active = selectedPupilOption == id
+                        Surface(
+                            modifier = Modifier
+                                .clickable { selectedPupilOption = id }
+                                .testTag("pupil_tab_$id"),
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (active) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (active) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp), RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "⚡ Controles de Estímulo Físico:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(
+                            "none" to "💡 Apagado",
+                            "left" to "🔦 Linterna Izq.",
+                            "right" to "🔦 Linterna Der."
+                        ).forEach { (stim, label) ->
+                            val active = lightStimulus == stim && !nearFocus
+                            FilledTonalButton(
+                                onClick = { 
+                                    lightStimulus = stim
+                                    nearFocus = false 
+                                },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (active) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = if (active) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(32.dp)
+                                    .testTag("stimulus_$stim")
+                            ) {
+                                Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { nearFocus = !nearFocus }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Adjust,
+                                contentDescription = null,
+                                tint = if (nearFocus) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Simular Esfuerzo de Convergencia (Acomodación)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Switch(
+                            checked = nearFocus,
+                            onCheckedChange = { nearFocus = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.tertiary,
+                                checkedTrackColor = MaterialTheme.colorScheme.tertiaryContainer
+                            ),
+                            modifier = Modifier
+                                .graphicsLayer { 
+                                    scaleX = 0.8f
+                                    scaleY = 0.8f 
+                                }
+                                .height(22.dp)
+                                .testTag("accommodation_switch")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Pupila Izq.", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                PupilsEyeCanvas(isLeftEye = true, pathology = selectedPupilOption, stimulus = lightStimulus, nearFocus = nearFocus)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Pupila Der.", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                PupilsEyeCanvas(isLeftEye = false, pathology = selectedPupilOption, stimulus = lightStimulus, nearFocus = nearFocus)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val diagnosticDetails = when (selectedPupilOption) {
+                            "normal" -> {
+                                when {
+                                    nearFocus -> "Isocoria Normal con Miosis Bilateral por Reflejo de Acomodación cercano activo en ambos ojos."
+                                    lightStimulus == "left" -> "Isocoria Normal: Miosis bilateral reactiva inducida por linterna directa en Ojo Izquierdo y respuesta consensual intacta de Ojo Derecho."
+                                    lightStimulus == "right" -> "Isocoria Normal: Miosis bilateral reactiva inducida por linterna directa en Ojo Derecho y respuesta consensual intacta de Ojo Izquierdo."
+                                    else -> "Fisiológico Basal: Isocoria simétrica del esfínter pupilar sin estímulos lumínicos directos (Diámetro 3-4 mm)."
+                                }
+                            }
+                            "midriasis_uni" -> {
+                                when {
+                                    lightStimulus == "left" -> "Midriasis Unilateral Arreactiva Izquierda: Ojo Izquierdo permanece dilatado de forma arreactiva debido a lesión eferente parasimpática del III par. Ojo Derecho sí realiza miosis normal por vía aferente (óptico) intacto en ojo izquierdo coordinado con eferente derecho."
+                                    lightStimulus == "right" -> "Midriasis Unilateral Arreactiva Izquierda: La linterna en Ojo Derecho causa miosis directa derecha. Pero falla en generar miosis indirecta/consensual en Ojo Izquierdo por el bloqueo eferente ipsilateral."
+                                    else -> "Anisocoria por Midriasis Arreactiva Unilateral Izquierda: Sugiere parálisis compresiva del III Par craneal. Requiere descartar de inmediato hernia uncal ipsilateral en paciente crítico post-ACV."
+                                }
+                            }
+                            "horner" -> {
+                                val ptosisText = " asociado a discreta Ptosis palpebral ipsilateral (caída del párpado por denervación del músculo tarsal superior de Müller)."
+                                if (lightStimulus != "none") {
+                                    "Síndrome de Horner Izquierdo: Miosis basal con reacción a la luz parcialmente conservada (el esfínter se contrae aún más por la vía parasimpática intacta)$ptosisText"
+                                } else {
+                                    "Síndrome de Horner Izquierdo: Miosis fija basal por parálisis ocular simpática (vía simpática descendente bulbo/tallo rota)$ptosisText"
+                                }
+                            }
+                            "midriasis_bi" -> "Midriasis Bilateral Arreactiva Total: Ausencia de respuesta ante cualquier estímulo de luz bilateral. Hallazgo crítico compatible con Muerte Cerebral global, intoxicación severa por bloqueadores colinérgicos (atropina) o shock hipóxico profundo."
+                            "parinaud" -> {
+                                if (nearFocus) {
+                                    "Síndrome de Parinaud (Disociación Luz-Cerca): ¡Las pupilas sí reaccionan y realizan miosis de acomodación simétrica (0.18f)! Esto demuestra que las fibras pupilares para la acomodación cercana -que corren de forma más ventral- están intactas."
+                                } else {
+                                    "Síndrome de Parinaud (Disociación Luz-Cerca): Ambas pupilas son de base medianamente grandes/dilatadas (diámetro basal aprox 5 mm) y muestran ARREACTIVIDAD o nula respuesta a la luz directa por infarto/lesión dorsal mesencefálica (núcleo pretectal dañado)."
+                                }
+                            }
+                            else -> ""
+                        }
+
+                        Text(
+                            text = diagnosticDetails,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp).testTag("pupil_diagnostic_text")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = {
+                        val pathLabel = pupilOptions.find { it.first == selectedPupilOption }?.second ?: ""
+                        val stimulusLabel = when {
+                            nearFocus -> "Enfoque cercano (Acomodación)"
+                            lightStimulus == "left" -> "Linterna en Ojo Izquierdo"
+                            lightStimulus == "right" -> "Linterna en Ojo Derecho"
+                            else -> "Sin estímulo (Ambiental)"
+                        }
+                        onCopyClicked(
+                            "DINÁMICA PUPILAR (ANOMALÍAS)",
+                            "Patología: $pathLabel",
+                            "Estímulo: $stimulusLabel\nHallazgo: ${
+                                if (selectedPupilOption == "horner") "Miosis Izquierda con Ptosis ipsilateral" 
+                                else if (selectedPupilOption == "midriasis_uni") "Anisocoria (Pupila Izq dilatada arreactiva)"
+                                else if (selectedPupilOption == "midriasis_bi") "Midriasis Bilateral Arreactiva Fija"
+                                else if (selectedPupilOption == "parinaud") "Disociación Luz-Cerca Pupilares"
+                                else "Normal Isocóricas"
+                            }"
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("copy_pupillary_dynamics"),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Copiar Dinámica Pupilar", fontSize = 12.sp)
+                }
+            }
+        }
+
+        // CARD 3: BRAINSTEM SYNDROMES
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("brainstem_syndromes_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Síndromes Clínicos de Tronco Encefálico",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Consulte las directivas de localización y presentación clínica de los principales síndromes vasculares del tronco cerebral.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val syndromes = listOf(
+                    Triple(
+                        "Oftalmoplejía Internuclear (OIN)",
+                        "Lóbulo/Anatomía: Fascículo Longitudinal Medial (FLM) | Puente / Protuberancia superior",
+                        "Cursa con deterioro severo de la aducción ocular ipsilateral al intentar el giro ocular contralateral. Se asocia clásicamente a un nistagmo disociado horizontal en el ojo abductor. En mayores de 40 años, su principal etiología fisiopatológica es el infarto isquémico unilateral o bilateral de ramas penetrantes paramedianas de la arteria basilar pontina."
+                    ),
+                    Triple(
+                        "Síndrome de Parinaud (Mesencéfalo Dorsal)",
+                        "Lóbulo/Anatomía: Tegmento Mesencefálico posterior / Comisura Posterior",
+                        "Producido habitualmente por oclusión o infarto en el territorio distal de las ramas talamoperforantes profundas, o por compresión pineal. Clínicamente cursa con parálisis de la mirada vertical superior de los ojos, nistagmo de convergencia-retracción patognomónico al intentar enfocar hacia arriba, y disociación luz-cerca en las pupilas."
+                    ),
+                    Triple(
+                        "Síndrome \"Top of the Basilar\" (Caplan)",
+                        "Lóbulo/Anatomía: Oclusión Embólica distal de Arteria Basilar | Bifurcación Mesencefálica / Tálamos",
+                        "Oclusión terminal del flujo que provoca infartos bilaterales simétricos tipo 'mariposa' en tálamos mediales, núcleos del II, III, y IV par, y porciones mesencefálicas. Genera parálisis del III par bilateral o unilateral, pupilas midriáticas arreactivas severas completas, ceguera cortical hemianópsica, hipersomnia profunda refractaria por compromiso del SARA, y alucinaciones visuales pedunculares de Lhermitte."
+                    ),
+                    Triple(
+                        "Bulbo Lateral (Síndrome de Wallenberg)",
+                        "Lóbulo/Anatomía: Arteria Cerebelosa Posteroinferior (PICA) / Vertebral | Bulbo Raquídeo lateral",
+                        "Es el síndrome alterno más común del tallo cerebral por isquemia. Clínicamente cursa con: Síndrome de Horner ipsilateral (pérdida de la vía simpática descendente en el bulbo lateral), hipoestesia facial ipsilateral en V par con hemi-anestesia termoalgésica cruzada contralateral en tronco y extremidades, disfonía y disfagia severa (compromiso de núcleos ambiguo y neumogástrico/glosofaríngeo), e inestabilidad y ataxia ipsilateral por cuerpo restiforme."
+                    )
+                )
+
+                syndromes.forEachIndexed { idx, (title, sub, text) ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .testTag("syndrome_card_$idx"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(sub, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.secondary, modifier = Modifier.padding(vertical = 2.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp)
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(
+                                    onClick = {
+                                        onCopyClicked("SÍNDROME DE TRONCO - $title", sub, text)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.testTag("copy_syndrome_$idx")
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Copiar Reporte", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VisualFieldVisualizer(
+    option: Int,
+    lesionSide: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Ojo Izquierdo", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            VisualFieldEyeCanvas(isLeftEye = true, option = option, lesionSide = lesionSide)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Ojo Derecho", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            VisualFieldEyeCanvas(isLeftEye = false, option = option, lesionSide = lesionSide)
+        }
+    }
+}
+
+@Composable
+fun VisualFieldEyeCanvas(
+    isLeftEye: Boolean,
+    option: Int,
+    lesionSide: String
+) {
+    androidx.compose.foundation.Canvas(
+        modifier = Modifier
+            .size(110.dp)
+            .background(Color.Transparent)
+            .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            .padding(4.dp)
+    ) {
+        val diameter = size.minDimension
+        val radius = diameter / 2f
+        val centerPoint = androidx.compose.ui.geometry.Offset(radius, radius)
+
+        drawCircle(
+            color = Color(0xFFE2E8F0),
+            radius = radius,
+            center = centerPoint
+        )
+
+        val blindSpotOffset = if (isLeftEye) {
+            androidx.compose.ui.geometry.Offset(radius - radius * 0.45f, radius)
+        } else {
+            androidx.compose.ui.geometry.Offset(radius + radius * 0.45f, radius)
+        }
+        drawCircle(
+            color = Color(0xFFCBD5E1),
+            radius = radius * 0.08f,
+            center = blindSpotOffset
+        )
+
+        val scotomaColor = Color(0xFF1E293B)
+
+        if (option == 4) {
+            drawCircle(
+                color = scotomaColor,
+                radius = radius,
+                center = centerPoint
+            )
+        } else {
+            val defectOnRight = lesionSide == "izq"
+
+            if (option == 0) {
+                if (defectOnRight) {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 270f,
+                        sweepAngle = 180f,
+                        useCenter = true
+                    )
+                } else {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 90f,
+                        sweepAngle = 180f,
+                        useCenter = true
+                    )
+                }
+                drawCircle(
+                    color = Color(0xFFE2E8F0),
+                    radius = radius * 0.16f,
+                    center = centerPoint
+                )
+            }
+            else if (option == 1 || option == 2) {
+                if (defectOnRight) {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 270f,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                } else {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 180f,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                }
+            }
+            else if (option == 3) {
+                if (defectOnRight) {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 0f,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                } else {
+                    drawArc(
+                        color = scotomaColor,
+                        startAngle = 90f,
+                        sweepAngle = 90f,
+                        useCenter = true
+                    )
+                }
+            }
+        }
+
+        drawCircle(
+            color = Color.White,
+            radius = radius * 0.05f,
+            center = centerPoint
+        )
+    }
+}
+
+@Composable
+fun PupilsEyeCanvas(
+    isLeftEye: Boolean,
+    pathology: String,
+    stimulus: String,
+    nearFocus: Boolean
+) {
+    val pupilFraction = getPupilFraction(if (isLeftEye) "left" else "right", pathology, stimulus, nearFocus)
+    val isLightShiningOnThisEye = (stimulus == "left" && isLeftEye) || (stimulus == "right" && !isLeftEye)
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(110.dp)
+            .background(if (isLightShiningOnThisEye) Color(0xFFFEF08A).copy(alpha = 0.25f) else Color.Transparent, CircleShape)
+            .border(
+                width = if (isLightShiningOnThisEye) 3.dp else 1.5.dp,
+                color = if (isLightShiningOnThisEye) Color(0xFFFACC15) else MaterialTheme.colorScheme.outlineVariant,
+                shape = CircleShape
+            )
+            .padding(4.dp)
+    ) {
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val d = size.minDimension
+            val radius = d / 2f
+            val centerPoint = androidx.compose.ui.geometry.Offset(radius, radius)
+
+            drawCircle(
+                color = Color.White,
+                radius = radius,
+                center = centerPoint
+            )
+
+            val irisColor = Color(0xFF507687) 
+            drawCircle(
+                color = irisColor,
+                radius = radius * 0.70f,
+                center = centerPoint
+            )
+            
+            drawCircle(
+                color = Color(0xFF384F5A),
+                radius = radius * 0.70f,
+                center = centerPoint,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+            )
+
+            val pupilRadiusFraction = pupilFraction * radius * 0.70f
+            drawCircle(
+                color = Color(0xFF0F172A),
+                radius = pupilRadiusFraction,
+                center = centerPoint
+            )
+
+            drawCircle(
+                color = Color.White.copy(alpha = 0.8f),
+                radius = radius * 0.08f,
+                center = androidx.compose.ui.geometry.Offset(radius - pupilRadiusFraction * 0.3f, radius - pupilRadiusFraction * 0.3f)
+            )
+
+            if (pathology == "horner" && isLeftEye) {
+                val lidHeight = size.height * 0.25f
+                drawRect(
+                    color = Color(0xFFE2B997), 
+                    size = androidx.compose.ui.geometry.Size(size.width, lidHeight),
+                    topLeft = androidx.compose.ui.geometry.Offset(0f, 0f)
+                )
+                drawLine(
+                    color = Color(0xFFB48356),
+                    start = androidx.compose.ui.geometry.Offset(0f, lidHeight),
+                    end = androidx.compose.ui.geometry.Offset(size.width, lidHeight),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
+        }
+    }
+}
+
+fun getPupilFraction(
+    eye: String,
+    pathology: String,
+    stimulus: String,
+    nearFocus: Boolean
+): Float {
+    if (nearFocus) {
+        if (pathology == "midriasis_bi") return 0.72f
+        if (pathology == "midriasis_uni" && eye == "left") return 0.72f
+        return 0.16f
+    }
+
+    return when (pathology) {
+        "normal" -> {
+            if (stimulus == "none") 0.35f else 0.18f
+        }
+        "midriasis_uni" -> {
+            if (eye == "left") {
+                0.72f
+            } else {
+                if (stimulus == "none") 0.35f else 0.18f
+            }
+        }
+        "horner" -> {
+            if (eye == "left") {
+                if (stimulus == "none") 0.18f else 0.12f
+            } else {
+                if (stimulus == "none") 0.35f else 0.18f
+            }
+        }
+        "midriasis_bi" -> {
+            0.72f
+        }
+        "parinaud" -> {
+            0.52f
+        }
+        else -> 0.35f
     }
 }
 

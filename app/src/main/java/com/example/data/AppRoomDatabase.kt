@@ -15,6 +15,15 @@ data class SavedCalculation(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "user_favorites")
+data class UserFavorite(
+    @PrimaryKey val featureId: String, // e.g., "nihss", "urgencias"
+    val name: String,                  // Display name
+    val category: String,              // Categorization name
+    val type: String,                  // "calculator" or "criterio"
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 @Dao
 interface SavedCalculationDao {
     @Query("SELECT * FROM saved_calculations ORDER BY timestamp DESC")
@@ -30,9 +39,25 @@ interface SavedCalculationDao {
     suspend fun clearAll()
 }
 
-@Database(entities = [SavedCalculation::class], version = 1, exportSchema = false)
+@Dao
+interface UserFavoriteDao {
+    @Query("SELECT * FROM user_favorites ORDER BY timestamp DESC")
+    fun getAllFavorites(): Flow<List<UserFavorite>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFavorite(fav: UserFavorite)
+
+    @Query("DELETE FROM user_favorites WHERE featureId = :featureId")
+    suspend fun deleteFavorite(featureId: String)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM user_favorites WHERE featureId = :featureId LIMIT 1)")
+    fun isFavoriteFlow(featureId: String): Flow<Boolean>
+}
+
+@Database(entities = [SavedCalculation::class, UserFavorite::class], version = 2, exportSchema = false)
 abstract class AppRoomDatabase : RoomDatabase() {
     abstract fun savedCalculationDao(): SavedCalculationDao
+    abstract fun userFavoriteDao(): UserFavoriteDao
 
     companion object {
         @Volatile
@@ -69,5 +94,21 @@ class SavedCalculationRepository(private val dao: SavedCalculationDao) {
 
     suspend fun clear() {
         dao.clearAll()
+    }
+}
+
+class UserFavoriteRepository(private val dao: UserFavoriteDao) {
+    val allFavorites: Flow<List<UserFavorite>> = dao.getAllFavorites()
+
+    suspend fun saveFavorite(fav: UserFavorite) {
+        dao.insertFavorite(fav)
+    }
+
+    suspend fun deleteFavorite(featureId: String) {
+        dao.deleteFavorite(featureId)
+    }
+
+    fun isFavorite(featureId: String): Flow<Boolean> {
+        return dao.isFavoriteFlow(featureId)
     }
 }

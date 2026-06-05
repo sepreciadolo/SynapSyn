@@ -33,6 +33,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SavedCalculation
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.ui.text.font.FontFamily
+import kotlin.math.sin
 
 data class SectionNavItem(val id: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val emoji: String)
 data class ProtocolRowItem(val id: String, val title: String, val desc: String)
@@ -248,89 +268,147 @@ fun TabGuiasYEscalas(
                     modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp)
                 )
 
-                val categories = listOf(
-                    Triple("urgencias", "Urgencias Críticas y de Tallo", Pair("ACV agudo, Muerte cerebral, Vértigo agudo (HINTS+), Estado epiléptico, Coma, Meningitis aguda", Icons.Default.LocalHospital)),
-                    Triple("examen", "Examen Físico Neurológico", Pair("Pares craneales, evaluación de fuerza y tono motor, dermatomas sensitivos, y reflejos osteotendinosos bedside", Icons.Default.AccessibilityNew)),
-                    Triple("escalas", "Escalas de Valoración Rápida", Pair("Gravedad funcional global con Rankin mRS, Reisberg y FAST en demencia, clases clínicas de miastenia MGFA", Icons.Default.Layers)),
-                    Triple("neuroinfecto", "Neuroinfectología Bedside", Pair("Triage de patógenos, Análisis de LCR interactiva y algoritmo de tratamiento empírico de meningitis", Icons.Default.Science)),
-                    Triple("vascular", "Neurovascular Avanzado", Pair("Prevención secundaria, TIA minor stroke, HIC, HSA, TVC, Nomograma Heparina e inició DAPT", Icons.Default.Shield)),
-                    Triple("inmunologia", "Neuroinmunología & Epilepsia", Pair("Criterios McDonald 2024, NMOSD, Encefalitis autoinmune, Seguridad DMTs, ASM y toxicidad", Icons.Default.AutoAwesome)),
-                    Triple("cognicion", "Cognición y Movimiento", Pair("Biomarcadores AD 2024, Monoclonales Antiamiloide, Parkinson avanzado DBS, Toxina botulínica", Icons.Default.Psychology)),
-                    Triple("ordenes", "Generador de Órdenes y Notas", Pair("Estructura de órdenes rápidas de ingreso a urgencias y notas de evolución neuro-UCI", Icons.Default.Assignment))
+                val groupedCategories = listOf(
+                    Triple(
+                        "I. Urgencias & Cuidados Críticos (Neuro-UCI)",
+                        Color(0xFFE11D48),
+                        listOf(
+                            Triple("urgencias", "Urgencias Críticas y de Tallo", Pair("ACV agudo, Muerte cerebral, Vértigo agudo (HINTS+), Estado epiléptico, Coma, Meningitis aguda", Icons.Default.LocalHospital)),
+                            Triple("neuroinfecto", "Neuroinfectología Bedside", Pair("Triage de patógenos, Análisis de LCR interactiva y algoritmo de tratamiento empírico de meningitis", Icons.Default.Science)),
+                            Triple("ordenes", "Plantillas de Órdenes y Evolución", Pair("Estructura de órdenes rápidas de ingreso a urgencias y notas de evolución neuro-UCI", Icons.Default.Assignment))
+                        )
+                    ),
+                    Triple(
+                        "II. Enfermedad Cerebrovascular (Ictus)",
+                        Color(0xFF2563EB),
+                        listOf(
+                            Triple("vascular", "Neurovascular Avanzado", Pair("Prevención secundaria, TIA minor stroke, HIC, HSA, TVC, Nomograma Heparina e inició DAPT", Icons.Default.Shield)),
+                            Triple("etiologia_acv", "Etiología y Fenotipos ACV (TOAST, ASCOD)", Pair("Algoritmo etiológico TOAST, fenotipificación interactiva ASCOD, escala de placa carotídea Plaque-RADS y algoritmo CCS.", Icons.Default.BubbleChart)),
+                            Triple("consenso_acv", "Consenso Académico (ACV)", Pair("Parámetros Software DEFUSE-3 / Mismatch, Correlación HIC Hipertensiva vs Lobar (Boston v2.0) y referencias", Icons.Default.FactCheck))
+                        )
+                    ),
+                    Triple(
+                        "III. Exploración Clínica & Valoración Bedside",
+                        Color(0xFF0D9488),
+                        listOf(
+                            Triple("examen", "Examen Físico Neurológico", Pair("Pares craneales, evaluación de fuerza y tono motor, dermatomas sensitivos, y reflejos osteotendinosos bedside", Icons.Default.AccessibilityNew)),
+                            Triple("escalas", "Escalas de Valoración Rápida", Pair("Gravedad funcional global con Rankin mRS, Reisberg y FAST en demencia, clases clínicas de miastenia MGFA", Icons.Default.Layers))
+                        )
+                    ),
+                    Triple(
+                        "IV. Neurología de Consulta & Especialidades",
+                        Color(0xFF7C3AED),
+                        listOf(
+                            Triple("inmunologia", "Neuroinmunología & Epilepsia", Pair("Criterios McDonald 2024, NMOSD, Encefalitis autoinmune, Seguridad DMTs, ASM y toxicidad", Icons.Default.AutoAwesome)),
+                            Triple("cognicion", "Cognición y Movimiento", Pair("Biomarcadores AD 2024, Monoclonales Antiamiloide, Parkinson avanzado DBS, Toxina botulínica", Icons.Default.Psychology))
+                        )
+                    )
                 )
 
-                categories.forEach { (id, title, meta) ->
-                    val (desc, icon) = meta
-                    val accentColor = when (id) {
-                        "urgencias" -> Color(0xFFE11D48)
-                        "examen" -> Color(0xFF8B5CF6)
-                        "neuroinfecto" -> Color(0xFF059669)
-                        "vascular" -> Color(0xFF2563EB)
-                        "inmunologia" -> Color(0xFF7C3AED)
-                        "cognicion" -> Color(0xFFD97706)
-                        "escalas" -> Color(0xFF0D9488)
-                        else -> Color(0xFF4B5563)
-                    }
-
-                    Card(
-                        onClick = {
-                            selectedSectionId = id
-                            activeProtocolId = null
-                        },
+                groupedCategories.forEach { (groupTitle, groupColor, groupItems) ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("clinical_category_card_$id"),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            .padding(top = 10.dp)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = accentColor.copy(alpha = 0.1f),
-                                modifier = Modifier.size(46.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(groupColor)
+                            )
+                            Text(
+                                text = groupTitle.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                color = groupColor
+                            )
+                        }
+
+                        groupItems.forEach { (id, title, meta) ->
+                            val (desc, icon) = meta
+                            val accentColor = when (id) {
+                                "urgencias" -> Color(0xFFE11D48)
+                                "examen" -> Color(0xFF8B5CF6)
+                                "neuroinfecto" -> Color(0xFF059669)
+                                "vascular" -> Color(0xFF2563EB)
+                                "consenso_acv" -> Color(0xFF0284C7)
+                                "inmunologia" -> Color(0xFF7C3AED)
+                                "cognicion" -> Color(0xFFD97706)
+                                "escalas" -> Color(0xFF0D9488)
+                                "etiologia_acv" -> Color(0xFF14B8A6)
+                                else -> Color(0xFF4B5563)
+                            }
+
+                            Card(
+                                onClick = {
+                                    selectedSectionId = id
+                                    activeProtocolId = null
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("clinical_category_card_$id"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = accentColor.copy(alpha = 0.1f),
+                                        modifier = Modifier.size(46.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = title,
+                                                tint = accentColor,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(14.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = desc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+
                                     Icon(
-                                        imageVector = icon,
-                                        contentDescription = title,
-                                        tint = accentColor,
-                                        modifier = Modifier.size(22.dp)
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Siguiente",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = desc,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 14.sp
-                                )
-                            }
-
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = "Siguiente",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     }
                 }
@@ -341,6 +419,7 @@ fun TabGuiasYEscalas(
                 // Header / Breadcrumb navigation row
                 Card(
                     modifier = Modifier
+                        .statusBarsPadding()
                         .fillMaxWidth()
                         .padding(bottom = 12.dp, top = 4.dp),
                     colors = CardDefaults.cardColors(
@@ -384,6 +463,8 @@ fun TabGuiasYEscalas(
                                 "urgencias" -> "Urgencias Críticas"
                                 "examen" -> "Examen Físico"
                                 "vascular" -> "Neurovascular Avanzado"
+                                "consenso_acv" -> "Consenso Académico (ACV)"
+                                "etiologia_acv" -> "Etiología y Fenotípicos (ACV)"
                                 "neuroinfecto" -> "Neuroinfectología Bedside"
                                 "inmunologia" -> "Neuroinmuno & Epilepsia"
                                 "cognicion" -> "Cognición, Movimiento & Más"
@@ -445,6 +526,17 @@ fun TabGuiasYEscalas(
                                 ),
                                 onProtocolSelected = { activeProtocolId = it }
                             )
+                            "consenso_acv" -> {
+                                ConsensoAcvScreen(
+                                    onCopyClicked = onCopyClicked,
+                                    onNavigateToDrug = onNavigateToDrug
+                                )
+                            }
+                            "etiologia_acv" -> {
+                                EtiologiaAcvScreen(
+                                    onCopyClicked = onCopyClicked
+                                )
+                            }
                             "inmunologia" -> ProtocolDirectorySection(
                                 title = "Neuroinmuno & Epilepsia",
                                 protocols = listOf(
@@ -550,7 +642,7 @@ fun ProtocolDirectory(onProtocolSelected: (String) -> Unit) {
                 ProtocolItem("encefalitis_autoinmune", "Encefalitis Autoinmune (Criterios Graus)", "Sospecha biológica, panel de anticuerpos en LCR/Sangre, pauta inmediata de esteroides/Inmunoglobulinas."),
                 ProtocolItem("terapias_dmt_seguridad", "Seguridad de Terapias Modificadoras", "Tamizaje TB/VIH/Hepatitis, vacunación, estratificación de PML por JCV, embarazo, riesgo linfopenia."),
                 ProtocolItem("primera_crisis", "Primera Crisis Convulsiva no Provocada", "Riesgo de recurrencia, indicaciones para RM/EEG, pauta terapéutica inicial y regulaciones cotidianas."),
-                ProtocolItem("seleccion_asm", "Selección Inteligente de Fármacos (ASM)", "Por sexo/embarazo, comorbilidad psíquica, disfunción biliar/renal, migraña, interacciones medicamentosas."),
+                ProtocolItem("seleccion_asm", "Selección de Fármacos Anticrisis (ASM)", "Por sexo/embarazo, comorbilidad psíquica, disfunción biliar/renal, migraña, interacciones medicamentosas."),
                 ProtocolItem("monitoreo_toxicidad", "Monitoreo de Fármacos & Toxicidad", "Rango terapéutico de Fenitoína/Valproato, riesgo HLA-B*1502/SJS con Carbamazepina, hepatotoxicidad, hiponatremia."),
                 ProtocolItem("refractariedad_sudep", "Epilepsia Farmacorresistente & SUDEP", "Criterios de refractariedad, mitigación de SUDEP, envío a unidad de cirugía, pre-surgical workup básico.")
             )
@@ -1601,7 +1693,7 @@ fun ProtocolDetailView(
             "estado_epileptico" -> {
                 GuideHeader("Estado Epiléptico Agudo", "Tratamiento por Fases del Status Epilepticus Convulsivo", "American Epilepsy Society (AES) Guidelines", "Vigente / Actualización 2026")
 
-                SectionCard("Calculadora Inteligente de Dosis por Peso") {
+                SectionCard("Calculadora de Dosificación de Emergencia por Peso") {
                     Text("Ingresa el peso estimado del paciente para calcular dosis bedside:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -2112,7 +2204,7 @@ fun ProtocolDetailView(
             }
 
             "seleccion_asm" -> {
-                GuideHeader("Selección Inteligente de Fármacos", "Prescripción de Fármacos Anticrisis por Perfil", "Consenso Clínico ILAE", "Vigente 2026")
+                GuideHeader("Prescripción de Fármacos Anticrisis (ASM)", "Selección de fármacos según perfil clínico, comorbilidades y tolerancia", "Consenso Clínico ILAE", "Vigente 2026")
 
                 SectionCard("1. Restricciones e Indicaciones Específicas") {
                     BulletText("Mujeres de Edad Fértil / Embarazo", "¡Evitar Ácido Valproico! Riesgo de teratogenicidad fetal masiva y retraso del neurodesarrollo. Preferir de entrada Lamotrigina o Levetiracetam (fármacos con mejores perfiles de seguridad obstétrica).")
@@ -2143,7 +2235,7 @@ fun ProtocolDetailView(
                 GuideHeader("Epilepsia Farmacorresistente & SUDEP", "Protocolos de Referencia Oportuna e Intervenciones", "Consenso de Expertos ILAE", "Vigente 2026")
 
                 SectionCard("1. Epilepsia Farmacorresistente") {
-                    BulletText("Definición", "Persistencia de crisis epilépticas a pesar del ensayo adecuado y bien tolerado de 2 regímenes de Fármacos Anticrisis (ASMs) elegidos de manera inteligente y dosificados a metas terapéuticas correspondientes.")
+                    BulletText("Definición", "Persistencia de crisis epilépticas a pesar del ensayo adecuado y bien tolerado de 2 regímenes de Fármacos Anticrisis (ASMs) elegidos de manera adecuada según el tipo de crisis y dosificados a metas terapéuticas correspondientes.")
                     BulletText("Siguiente Paso", "Obligatorio referir inmediatamente a una Unidad Terciaria de Epilepsia para realización de Video-EEG prolongado de fase diagnóstica, RM con protocolo Hard-Epilepsy de 3 Teslas para mapear posible displasia cortical focal, y valorar cirugía curativa, estimulación vagal (VNS) u opción de dieta cetogénica.")
                 }
 
@@ -2609,6 +2701,7 @@ data class SyndromeTemplate(
 // ==========================================
 // COMPONENT 4: LEGACY BEDSIDE SCALES (mRS, FAST, MGFA, ABCD2, Hunt-Hess, Fisher, Historial)
 // ==========================================
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LegacyBedsideScales(
     selectedMrsGrade: Int?,
@@ -2652,7 +2745,7 @@ fun LegacyBedsideScales(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("Escala de Rankin Modificada (mRS)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text("Medida de resultado funcional global usada clásicamente en ensayos de ictus vascular. Rango de 0 (sintomático nulo) a 6 (difunto).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2667,29 +2760,52 @@ fun LegacyBedsideScales(
                             "Grado 6" to "Defunción / Muerte."
                         )
 
-                        grades.forEachIndexed { i, (lbl, desc) ->
-                            val isSelected = selectedMrsGrade == i
-                            Card(
-                                onClick = { onMrsGradeSelected(i) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            ) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = isSelected, onClick = { onMrsGradeSelected(i) })
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(lbl, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                        Text(text = "Seleccione el grado residual descriptivo:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            grades.forEachIndexed { i, (lbl, _) ->
+                                val isSelected = selectedMrsGrade == i
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { onMrsGradeSelected(i) }
+                                        .testTag("mrs_option_$i"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = lbl,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
                                 }
                             }
                         }
 
                         selectedMrsGrade?.let { idx ->
+                            val (lbl, desc) = grades[idx]
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(text = lbl, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.secondary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Button(
-                                onClick = { onCopyClicked("Rankin Modificado (mRS)", "Grado $idx", grades[idx].second) },
-                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                                onClick = { onCopyClicked("Rankin Modificado (mRS)", lbl, desc) },
+                                modifier = Modifier.fillMaxWidth().testTag("copy_mrs")
                             ) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -2703,7 +2819,7 @@ fun LegacyBedsideScales(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("Estadificación FAST de Reisberg", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text("Functional Assessment Staging (FAST). Escala descriptiva para evaluar progresión y pérdida de funcionalidad en demencia de tipo Alzheimer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2718,29 +2834,52 @@ fun LegacyBedsideScales(
                             "FAST 7" to "Demencia severa. Pérdida del habla articulada, rigidez muscular, incapacidad para sonreír, sostener la cabeza o deglutir."
                         )
 
-                        stages.forEachIndexed { i, (lbl, desc) ->
-                            val isSelected = selectedFastStage == (i + 1)
-                            Card(
-                                onClick = { onFastStageSelected(i + 1) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            ) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = isSelected, onClick = { onFastStageSelected(i + 1) })
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(lbl, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                        Text(text = "Seleccione etapa funcional actual:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            stages.forEachIndexed { i, (lbl, _) ->
+                                val isSelected = selectedFastStage == (i + 1)
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { onFastStageSelected(i + 1) }
+                                        .testTag("fast_option_$i"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = lbl,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
                                 }
                             }
                         }
 
                         selectedFastStage?.let { stageIdx ->
+                            val (lbl, desc) = stages[stageIdx - 1]
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(text = lbl, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.secondary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Button(
-                                onClick = { onCopyClicked("Estadío FAST de Reisberg", "FAST $stageIdx", stages[stageIdx - 1].second) },
-                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                                onClick = { onCopyClicked("Estadío FAST de Reisberg", lbl, desc) },
+                                modifier = Modifier.fillMaxWidth().testTag("copy_fast")
                             ) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -2754,7 +2893,7 @@ fun LegacyBedsideScales(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text("Clasificación Clínica de MGFA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text("Myasthenia Gravis Foundation of America (MGFA). Clasifica la severidad clínica funcional global de los pacientes diagnosticados con Miastenia Gravis.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2767,29 +2906,52 @@ fun LegacyBedsideScales(
                             "Clase V" to "Crisis Miasténica. Requerimiento inminente de intubación orotraqueal ventilatoria."
                         )
 
-                        classes.forEachIndexed { i, (lbl, desc) ->
-                            val isSelected = selectedMgfaClass == i
-                            Card(
-                                onClick = { onMgfaClassSelected(i) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            ) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = isSelected, onClick = { onMgfaClassSelected(i) })
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(lbl, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                        Text(text = "Seleccione clase clínica diagnosticada:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                        androidx.compose.foundation.layout.FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            classes.forEachIndexed { i, (lbl, _) ->
+                                val isSelected = selectedMgfaClass == i
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { onMgfaClassSelected(i) }
+                                        .testTag("mgfa_option_$i"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = lbl,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
                                 }
                             }
                         }
 
                         selectedMgfaClass?.let { idx ->
+                            val (lbl, desc) = classes[idx]
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(text = lbl, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.secondary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Button(
-                                onClick = { onCopyClicked("Clasificación Clínica MGFA", classes[idx].first, classes[idx].second) },
-                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                                onClick = { onCopyClicked("Clasificación de Miastenia MGFA", lbl, desc) },
+                                modifier = Modifier.fillMaxWidth().testTag("copy_mgfa")
                             ) {
                                 Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -4676,46 +4838,260 @@ fun SameTt2r2Calculator() {
 fun Abc2Calculator() {
     var dimA by remember { mutableStateOf("") }
     var dimB by remember { mutableStateOf("") }
-    var dimC by remember { mutableStateOf("") }
+    var useInteractiveC by remember { mutableStateOf(false) }
+    var manualDimC by remember { mutableStateOf("") }
+    
+    // Interactive C variables
+    var sliceThickness by remember { mutableStateOf("5.0") } // in mm (e.g., 2.5, 5.0, 10.0)
+    var numSlices by remember { mutableStateOf(4) }
+    val sliceScores = remember { mutableStateListOf<Float>().apply { addAll(List(16) { 0.5f }) } }
 
     val valA = dimA.toDoubleOrNull() ?: 0.0
     val valB = dimB.toDoubleOrNull() ?: 0.0
-    val valC = dimC.toDoubleOrNull() ?: 0.0
-    val volume = (valA * valB * valC) / 2.0
+    
+    val computedC = if (useInteractiveC) {
+        val thicknessCm = (sliceThickness.toDoubleOrNull() ?: 5.0) / 10.0
+        val sumScores = sliceScores.take(numSlices).sum()
+        sumScores * thicknessCm
+    } else {
+        manualDimC.toDoubleOrNull() ?: 0.0
+    }
 
-    Card {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Volumen de Hemorragia Intracerebral Aguda (Fórmula ABC/2)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text("Calcula de forma simplificada en centímetros el volumen real del hematoma intraparenquimatoso a partir de los cortes axiales de la tomografía (TAC).", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+    val volume = (valA * valB * computedC) / 2.0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Calculadora de Tamaño de Hemorragia Cerebral (ABC/2)", 
+                style = MaterialTheme.typography.titleMedium, 
+                fontWeight = FontWeight.Bold, 
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "Estima el volumen del hematoma intraparenquimatoso en cc / mL basándose en cortes axiales de Tomografía Computarizada (TAC) sin contraste.", 
+                style = MaterialTheme.typography.bodySmall, 
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = dimA, onValueChange = { dimA = it },
-                    label = { Text("A (cm)", fontSize = 10.sp) }, modifier = Modifier.weight(1f).height(48.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    label = { Text("A: Diámetro mayor (cm)", fontSize = 10.sp) }, 
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text("Ej. 4.5", fontSize = 10.sp) }
                 )
                 OutlinedTextField(
                     value = dimB, onValueChange = { dimB = it },
-                    label = { Text("B (cm)", fontSize = 10.sp) }, modifier = Modifier.weight(1f).height(48.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                OutlinedTextField(
-                    value = dimC, onValueChange = { dimC = it },
-                    label = { Text("C (cm)", fontSize = 10.sp) }, modifier = Modifier.weight(1f).height(48.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    label = { Text("B: Diámetro perp. (cm)", fontSize = 10.sp) }, 
+                    modifier = Modifier.weight(1f).height(54.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text("Ej. 3.2", fontSize = 10.sp) }
                 )
             }
-            Text("Guía C: Multiplique el número de cortes con sangre visible por el espesor del corte de la TAC. EJ: 6 cortes de 5mm = 3.0 cm.", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontStyle = FontStyle.Italic)
+            Text(
+                "A es la longitud axial máxima; B es la longitud perpendicular a A en la misma sección axial.", 
+                style = MaterialTheme.typography.labelSmall, 
+                fontSize = 9.sp, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text("Volumen Estimado del Hematoma: ${"%.2f".format(volume)} mL / cc", fontWeight = FontWeight.Bold)
-                    val surgicalWarning = if (volume >= 30.0) {
-                        "⚠️ VOLUMEN CRÍTICO (≥ 30 mL). Riesgo grave de hipertensión endocraneal, edema perilesional y muerte a corto plazo. Alta sospecha de herniación."
-                    } else {
-                        "Volumen moderado (< 30 mL). Requiere control estricto médico."
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Switch between manual C & interactive C
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    false to "Entrada Manual C",
+                    true to "Corte C Interactivo (Slices)"
+                ).forEach { (isInter, label) ->
+                    val isSel = useInteractiveC == isInter
+                    val buttonBg = if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent
+                    val buttonText = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    
+                    Surface(
+                        onClick = { useInteractiveC = isInter },
+                        shape = RoundedCornerShape(6.dp),
+                        color = buttonBg,
+                        modifier = Modifier.weight(1f).height(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = buttonText)
+                        }
                     }
-                    Text(surgicalWarning, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                }
+            }
+
+            if (!useInteractiveC) {
+                OutlinedTextField(
+                    value = manualDimC, onValueChange = { manualDimC = it },
+                    label = { Text("C: Diámetro vertical / Espesor total (cm)", fontSize = 10.sp) }, 
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    placeholder = { Text("Ej. 3.0", fontSize = 10.sp) }
+                )
+                Text(
+                    "C se puede estimar multiplicando el número de cortes por el espesor del corte.", 
+                    style = MaterialTheme.typography.labelSmall, 
+                    fontSize = 9.sp, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                // Interactive C estimation
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Slice thickness dropdown selection
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Grosor de corte (TAC):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                    listOf("2.5", "5.0", "10.0").forEach { valThk ->
+                                        val isSel = sliceThickness == valThk
+                                        Surface(
+                                            onClick = { sliceThickness = valThk },
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.weight(1f).height(28.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text("${valThk} mm", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Num slices selector
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Cortes con sangre:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.padding(top = 4.dp).height(28.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { if (numSlices > 1) numSlices-- },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Text("$numSlices", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                                    IconButton(
+                                        onClick = { if (numSlices < 16) numSlices++ },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text("Clasifique corte frente al área máxima (Estudio Clínico):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                        
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (i in 0 until numSlices) {
+                                val currentScore = sliceScores.getOrNull(i) ?: 0.5f
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Corte ${i + 1}:", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, modifier = Modifier.width(60.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                                        listOf(
+                                            1.0f to "≥75% (1.0)",
+                                            0.5f to "25%-75% (0.5)",
+                                            0.0f to "<25% (0.0)"
+                                        ).forEach { (score, label) ->
+                                            val isSel = currentScore == score
+                                            Surface(
+                                                onClick = {
+                                                    while (sliceScores.size <= i) {
+                                                        sliceScores.add(0.5f)
+                                                    }
+                                                    sliceScores[i] = score
+                                                },
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.weight(1f).height(24.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        val sumPoints = sliceScores.take(numSlices).sum()
+                        Text(
+                            text = "Puntos de Corte Sumados: $sumPoints | C calculado = $sumPoints x (${sliceThickness}mm/10) = ${"%.2f".format(computedC)} cm",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Surface(
+                color = if (volume >= 30.0) Color(0xFFFEF2F2) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f), 
+                shape = RoundedCornerShape(10.dp), 
+                border = BorderStroke(1.dp, if (volume >= 30.0) Color(0xFFFCA5A5) else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Volumen Estimado del Hematoma (Muestreo ABC/2):", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        fontWeight = FontWeight.Bold,
+                        color = if (volume >= 30.0) Color(0xFF991B1B) else MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        "${"%.2f".format(volume)} mL / cc", 
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                        color = if (volume >= 30.0) Color(0xFFDC2626) else MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val surgicalWarning = if (volume >= 30.0) {
+                        "⚠️ CRÍTICO (≥ 30 mL): Predictor de alta mortalidad a los 30 días, alto riesgo de herniación y compresión de tronco. Consúltese cirugía descompresiva inmediata."
+                    } else if (volume > 0.0) {
+                        "Moderado / Pequeño (< 30 mL): Manejo médico estricto, vigilancia intensiva del nivel de conciencia y control continuo de tensión."
+                    } else {
+                        "Ingrese las longitudes axiales correspondientes para iniciar el cálculo."
+                    }
+                    Text(
+                        surgicalWarning, 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = if (volume >= 30.0) Color(0xFF7F1D1D) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp
+                    )
                 }
             }
         }
@@ -5121,5 +5497,3453 @@ fun CvstCalculator() {
         }
     }
 }
+
+// =========================================================================
+// CONSENSO ACADÉMICO (ACV) SCREEN & INTERACTIVE SUBSPECIALTY TOOLS
+// =========================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ConsensoAcvScreen(
+    onCopyClicked: (String, String, String) -> Unit,
+    onNavigateToDrug: (String) -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(2) } // default to Tab 2: "Neuroimagen & HIC (Boston v2.0)" to match screenshot
+
+    val tabsList = listOf(
+        "Prevención, Lípidos & Reperfusión",
+        "Fisiopatología & Etiologías",
+        "Neuroimagen & HIC (Boston v2.0)",
+        "Neuro-Oftalmología & OIN",
+        "Poblaciones Especiales & Joven",
+        "Calculadoras Clínicas"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Main HEADER matching the screenshot style
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "CONSENSO ACADÉMICO INTEGRADO",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Referencias de Subespecialidad en ACV",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // Sub-tabs row matching the custom tab slider
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            tabsList.forEachIndexed { index, title ->
+                val isSelected = selectedTab == index
+                val tabColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                
+                Button(
+                    onClick = { selectedTab = index },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = tabColor,
+                        contentColor = textColor
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.testTag("consenso_tab_$index")
+                ) {
+                    Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Tab Content renderer based on selection
+        when (selectedTab) {
+            0 -> TabPrevencionLipidos(onCopyClicked = onCopyClicked)
+            1 -> TabFisiopatologiaTOAST(onCopyClicked = onCopyClicked)
+            2 -> TabNeuroimagenHIC(onCopyClicked = onCopyClicked)
+            3 -> TabNeuroOftalmoIntegration(onCopyClicked = onCopyClicked)
+            4 -> TabPoblacionesEspeciales(onCopyClicked = onCopyClicked)
+            5 -> TabCalculadorasClinicas(onCopyClicked = onCopyClicked)
+        }
+    }
+}
+
+@Composable
+fun TabPrevencionLipidos(onCopyClicked: (String, String, String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("Meta Lipídica Ultrarrápida Aguda", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Toda sospecha o confirmación de etiología isquémica/ateroesclerótica en ACV recurrente o TIA amerita alta dosis inmediata de estatinas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                BulletPoint("LDL Objetivo stándard", "Menos de 55 mg/dL (1.4 mmol/L) and una reducción del >=50% respecto al basal.")
+                BulletPoint("Fármaco inicial", "Atorvastatina 80 mg cada noche. Si a las 4-6 semanas no se logra meta, adicionar Ezetimiba 10 mg/día.")
+                BulletPoint("Rol de inhibidores PCSK9", "Indicados precozmente en ACV isquémico recurrente de origen ateroesclerótico que ya usaban soporte máximo tolerado de estatinas + ezetimiba.")
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("Directivas de Reperfusión Temprana", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                BulletPoint("Ventana de Oro tPA/TNK", "Hasta las 4.5 horas desde el inicio de los síntomas. Tenecteplasa (TNK) 0.25 mg/kg (Max 25 mg) en bolo único es preferida.")
+                BulletPoint("Trombectomía Mecánica (0-6h)", "Indicada en oclusión de gran vaso (LVO) de circulación anterior (ICA, segmento M1 de ACM) con NIHSS >= 6 y ASPECTS >= 6.")
+                BulletPoint("Trombectomía en Ventana Extendida (6-24h)", "Guiada por mismatch de perfusión por RM/TC mediante criterios de selección clínica y de imagen de los ensayos DAWN y DEFUSE-3.")
+            }
+        }
+    }
+}
+
+@Composable
+fun TabFisiopatologiaTOAST(onCopyClicked: (String, String, String) -> Unit) {
+    var subTab by remember { mutableStateOf("TOAST") }
+    
+    // ASCOD states
+    var gradeA by remember { mutableStateOf(1) }
+    var gradeS by remember { mutableStateOf(0) }
+    var gradeC by remember { mutableStateOf(0) }
+    var gradeO by remember { mutableStateOf(0) }
+    var gradeD by remember { mutableStateOf(0) }
+    var activeCategory by remember { mutableStateOf("A") }
+
+    val ascodCode = "A$gradeA S$gradeS C$gradeC O$gradeO D$gradeD"
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Horizontal sub-tabs for Fisiopatología & Etiologías
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val subTabs = listOf(
+                "TOAST" to "Criterios TOAST",
+                "ASCOD" to "Fenotipo ASCOD",
+                "CCS" to "Algoritmo CCS",
+                "Plaque-RADS" to "Carótida Plaque-RADS"
+            )
+            subTabs.forEach { (id, label) ->
+                val isSelected = subTab == id
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { subTab = id },
+                    label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    modifier = Modifier.testTag("fisiopatologia_subtab_$id")
+                )
+            }
+        }
+
+        when (subTab) {
+            "TOAST" -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("Clasificación Etiológica de TOAST", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Algoritmo estándar para clasificar la causa del infarto cerebral isquémico agudo con el fin de definir la terapia antitrombótica y preventiva secundaria específica.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        ToastEtiologyRow("1. Aterosclerosis de Grandes Arterias (LAA)", "Compromiso de carótida común/interna u cerebral media ipsilateral con estenosis >= 50%.")
+                        ToastEtiologyRow("2. Cardioembolismo (CE)", "Presencia de fuente de alto riesgo: fibrilación auricular (FA), prótesis valvular, miocardiopatía severa, o trombo mural.")
+                        ToastEtiologyRow("3. Enfermedad de Pequeño Vaso (Lacunar)", "Infarto subcortical aislado < 1.5 cm en territorio de arterias penetrantes, típicamente por lipohialinosis o microateroma.")
+                        ToastEtiologyRow("4. Otras Etiologías Determinadas", "Disección arterial extracraneal/intracraneal, vasculitis primaria del SNC, CADASIL, síndrome antifosfolípido o hipercoagulabilidad.")
+                        ToastEtiologyRow("5. Etiología Indeterminada", "Debido a evaluación incompleta o incompleta por muerte del paciente, o presencia de múltiples causas competidoras plausibles.")
+                    }
+                }
+            }
+            "ASCOD" -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Fenotipificación ASCOD",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Grado de causalidad del evento isquémico para las 5 categorías potenciales de enfermedad (0-3, 9).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                            ) {
+                                Text(
+                                    text = ascodCode,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Seleccione una categoría para ajustar su grado:",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+
+                        val categoriesList = listOf(
+                            Triple("A", "Ate", gradeA),
+                            Triple("S", "SVD", gradeS),
+                            Triple("C", "Car", gradeC),
+                            Triple("O", "Oth", gradeO),
+                            Triple("D", "Dis", gradeD)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            categoriesList.forEach { (cat, label, grade) ->
+                                val isSelected = activeCategory == cat
+                                val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+
+                                Surface(
+                                    onClick = { activeCategory = cat },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = containerColor,
+                                    border = BorderStroke(1.dp, borderColor),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = "$cat$grade",
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = contentColor
+                                        )
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                            color = contentColor.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        val activeFullName = when (activeCategory) {
+                            "A" -> "Aterosclerosis (Large Artery)"
+                            "S" -> "Pequeño Vaso (Small Vessel Disease)"
+                            "C" -> "Cardioembolismo (Cardiac Source)"
+                            "O" -> "Otras Etiologías (Other Causes)"
+                            else -> "Disección Arterial (Dissection)"
+                        }
+
+                        val activeGrade = when (activeCategory) {
+                            "A" -> gradeA
+                            "S" -> gradeS
+                            "C" -> gradeC
+                            "O" -> gradeO
+                            else -> gradeD
+                        }
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Categoría: $activeFullName",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val options = listOf(
+                                        1 to "1 (Causal)",
+                                        2 to "2 (Incierto)",
+                                        3 to "3 (Improbable)",
+                                        0 to "0 (Ausente)",
+                                        9 to "9 (Est. insuf.)"
+                                    )
+
+                                    options.forEach { (optionVal, optionLabel) ->
+                                        val isOptSelected = activeGrade == optionVal
+                                        val optColor = if (isOptSelected) {
+                                            when (optionVal) {
+                                                1 -> Color(0xFFDC2626)
+                                                2 -> Color(0xFFD97706)
+                                                3 -> Color(0xFF2563EB)
+                                                0 -> Color(0xFF16A34A)
+                                                else -> Color(0xFF4B5563)
+                                            }
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        }
+
+                                        val optContentColor = if (isOptSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+
+                                        Surface(
+                                            onClick = {
+                                                when (activeCategory) {
+                                                    "A" -> gradeA = optionVal
+                                                    "S" -> gradeS = optionVal
+                                                    "C" -> gradeC = optionVal
+                                                    "O" -> gradeO = optionVal
+                                                    "D" -> gradeD = optionVal
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = optColor,
+                                            border = BorderStroke(1.dp, if (isOptSelected) optColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(34.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = optionLabel.split(" ")[0],
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = optContentColor,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                val (gradeTitle, gradeDetail) = getGradeDescription(activeCategory, activeGrade)
+                                
+                                val calloutColor = when (activeGrade) {
+                                    1 -> Color(0xFFFEF2F2)
+                                    2 -> Color(0xFFFFFBEB)
+                                    3 -> Color(0xFFEFF6FF)
+                                    0 -> Color(0xFFF0FDF4)
+                                    else -> Color(0xFFF9FAFB)
+                                }
+
+                                val calloutBorderColor = when (activeGrade) {
+                                    1 -> Color(0xFFFCA5A5)
+                                    2 -> Color(0xFFFCD34D)
+                                    3 -> Color(0xFF93C5FD)
+                                    0 -> Color(0xFF86EFAC)
+                                    else -> Color(0xFFD1D5DB)
+                                }
+
+                                val calloutTextColor = when (activeGrade) {
+                                    1 -> Color(0xFF991B1B)
+                                    2 -> Color(0xFF92400E)
+                                    3 -> Color(0xFF1E40AF)
+                                    0 -> Color(0xFF166534)
+                                    else -> Color(0xFF374151)
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = calloutColor,
+                                    border = BorderStroke(0.5.dp, calloutBorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            text = "Grado $activeGrade: $gradeTitle",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                            color = calloutTextColor
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = gradeDetail,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                            color = calloutTextColor.copy(alpha = 0.9f),
+                                            lineHeight = 13.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = {
+                                val buildSummary = buildString {
+                                    append("Fisiopatología / Fenotipo ASCOD: $ascodCode\n\n")
+                                    append("Detalle:\n")
+                                    listOf("A", "S", "C", "O", "D").forEach { cat ->
+                                        val grade = when (cat) {
+                                            "A" -> gradeA
+                                            "S" -> gradeS
+                                            "C" -> gradeC
+                                            "O" -> gradeO
+                                            else -> gradeD
+                                        }
+                                        val fName = when (cat) {
+                                            "A" -> "Aterosclerosis"
+                                            "S" -> "Pequeño Vaso"
+                                            "C" -> "Cardioembolismo"
+                                            "O" -> "Otras Causas"
+                                            else -> "Disección"
+                                        }
+                                        val (title, _) = getGradeDescription(cat, grade)
+                                        append("- $cat$grade: $fName ($title)\n")
+                                    }
+                                }
+                                onCopyClicked(
+                                    "Fenotipo ASCOD ($ascodCode)",
+                                    buildSummary,
+                                    "ASCOD copiado"
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Copiar Reporte ASCOD",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            "CCS" -> {
+                CcsClassificationContent(onCopyClicked = onCopyClicked)
+            }
+            "Plaque-RADS" -> {
+                PlaqueRadsContent(onCopyClicked = onCopyClicked)
+            }
+        }
+    }
+}
+
+@Composable
+fun CcsClassificationContent(onCopyClicked: (String, String, String) -> Unit) {
+    var relevanceStenosis by remember { mutableStateOf(false) }
+    var embolicRisk by remember { mutableStateOf("none") }
+    var lacunarSyndrome by remember { mutableStateOf(false) }
+    var lacquerLesion by remember { mutableStateOf(false) }
+    var otherCause by remember { mutableStateOf(false) }
+    
+    val ccsResult = remember(relevanceStenosis, embolicRisk, lacunarSyndrome, lacquerLesion, otherCause) {
+        val hasLaa = relevanceStenosis
+        val hasCe = embolicRisk != "none"
+        val hasSvd = lacunarSyndrome && lacquerLesion
+        
+        val activeCauses = mutableListOf<String>()
+        if (hasLaa) activeCauses.add("LAA (Grandes Arterias)")
+        if (hasCe) activeCauses.add("CE (Cardioembolismo)")
+        if (hasSvd) activeCauses.add("SVD (Pequeño Vaso)")
+        if (otherCause) activeCauses.add("Otras Etiologías")
+        
+        when {
+            activeCauses.size > 1 -> "Etiología Indeterminada: Causas Competidoras (${activeCauses.joinToString(" y ")})" to "Se identifican dos o más causas plausibles simultáneas. Requiere análisis individual de factores de riesgo y concordancia clínica."
+            activeCauses.isEmpty() -> "Etiología Indeterminada: Criptogénico / Evaluación Incompleta" to "No se logra identificar una causa clara comercial o faltan estudios de extensión (ej. Holter, ETE)."
+            hasLaa -> "Aterosclerosis de Grandes Arterias (LAA)" to "Estenosis ≥50% o inclusión de carótida común/interna u cerebral media ipsilateral pertinente al territorio del infarto."
+            hasCe && embolicRisk == "high" -> "Cardioembolismo de Alto Riesgo" to "Presencia de FA, prótesis mecánica, miocardiopatía dilatada (FEVI <30%), o trombo intracardiaco confirmado."
+            hasCe && embolicRisk == "medium" -> "Cardioembolismo de Riesgo Medio/Bajo" to "Presencia de foramen oval permeable (FOP) con aneurisma de septo, prolapso mitral con regurgitación severa, o FA paroxística muy infrecuente."
+            hasSvd -> "Enfermedad de Pequeño Vaso (Microangiopatía / Lacunar)" to "Síndrome clínico lacunar clásico con una lesión isquémica subcortical correspondiente ≤ 1.5 cm en territorio perforante."
+            otherCause -> "Otras Etiologías Determinadas" to "Causa hematológica, inmunológica u otra causa poco habitual documentada (p. ej., disección, vasculitis, CADASIL)."
+            else -> "Inclasificable" to ""
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Algoritmo Diagnóstico CCS / CSS",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Causative Classification of Stroke (CCS) es un sistema estructurado para homogeneizar el criterio clínico de subtipo de ACV isquémico.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Pregunta 1
+            Column {
+                Text("1. Compromiso Ateroesclerótico Proximal:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { relevanceStenosis = !relevanceStenosis }.padding(vertical = 4.dp)
+                ) {
+                    Checkbox(checked = relevanceStenosis, onCheckedChange = { relevanceStenosis = it }, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Estenosis ≥50% u oclusión de arteria intra/extracraneal ipsilateral correspondiente", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            // Pregunta 2
+            Column {
+                Text("2. Fuente Cardioembólica Presente:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val embolicOptions = listOf(
+                        "none" to "Ninguno",
+                        "medium" to "Medio / FOP",
+                        "high" to "Alto / FA"
+                    )
+                    embolicOptions.forEach { (option, label) ->
+                        val isSel = embolicRisk == option
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { embolicRisk = option },
+                            label = { Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // Pregunta 3
+            Column {
+                Text("3. Enfermedad de Pequeño Vaso (Ambos requeridos):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { lacunarSyndrome = !lacunarSyndrome }.padding(vertical = 4.dp)
+                ) {
+                    Checkbox(checked = lacunarSyndrome, onCheckedChange = { lacunarSyndrome = it }, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Síndrome Clínico lacunar típico (ej. Motor Puro, Sensitivo Puro)", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { lacquerLesion = !lacquerLesion }.padding(vertical = 4.dp)
+                ) {
+                    Checkbox(checked = lacquerLesion, onCheckedChange = { lacquerLesion = it }, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Lesión compatible en neuroimagen subcortical ≤ 1.5 cm", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            // Pregunta 4
+            Column {
+                Text("4. Otras Etiologías Raras / Determinadas:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { otherCause = !otherCause }.padding(vertical = 4.dp)
+                ) {
+                    Checkbox(checked = otherCause, onCheckedChange = { otherCause = it }, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Disección, vasculitis, hipercoagulabilidad severa, CADASIL, etc.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            // RESULTADOS
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Resultado CCS / CSS:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = ccsResult.first,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = ccsResult.second,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    val report = """
+                        ALGORITMO DIAGNÓSTICO CCS / CSS (CAUSATIVE CLASSIFICATION OF STROKE)
+                        -----------------------------------------------------------
+                        - Subtipo Clasificado: ${ccsResult.first}
+                        - Notas de Clasificación: ${ccsResult.second}
+                        - Detalle del Trabajo Diagnóstico:
+                          * Estenosis Arteria Proximal >=50%: ${if (relevanceStenosis) "SÍ" else "NO"}
+                          * Riesgo Cardioembólico: ${if (embolicRisk == "high") "ALTO (FA/prótesis)" else if (embolicRisk == "medium") "MEDIO (FOP/dilatación)" else "NINGUNO"}
+                          * Síndrome lacunar típico: ${if (lacunarSyndrome) "SÍ" else "NO"}
+                          * Lesión en TAC/RM <= 1.5cm: ${if (lacquerLesion) "SÍ" else "NO"}
+                          * Otra etiología especial: ${if (otherCause) "SÍ" else "NO"}
+                    """.trimIndent()
+                    onCopyClicked("CCS Classification", report, "CCS copiado al portapapeles")
+                },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text("Copiar Reporte CCS", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlaqueRadsContent(onCopyClicked: (String, String, String) -> Unit) {
+    var stenosisDegree by remember { mutableStateOf("none") }
+    var thrombus by remember { mutableStateOf(false) }
+    var ulceration by remember { mutableStateOf(false) }
+    var iph by remember { mutableStateOf(false) }
+    var lrnc by remember { mutableStateOf(false) }
+    var positiveRemodeling by remember { mutableStateOf(false) }
+
+    val hasHighRiskFeature = thrombus || ulceration || iph || lrnc || positiveRemodeling
+
+    val plaqueRadsResult = remember(stenosisDegree, thrombus, ulceration, iph, lrnc, positiveRemodeling) {
+        when {
+            stenosisDegree == "none" -> Triple(
+                "Plaque-RADS 0 (Sin Placa)", 
+                Color(0xFF16A34A),
+                "No hay evidencia de placas aterotrombóticas en la tomografía o angio-TAC del cuello. Riesgo cardiovascular ipsilateral mínimo."
+            )
+            stenosisDegree == "occlusion" -> Triple(
+                "Plaque-RADS 5 (Oclusión Total)", 
+                Color(0xFF7F1D1D),
+                "Oclusión carotídea total o subtotal crítica (95-100%). Flujo anterógrado colapsado o flujo lento filiforme. Evaluar de forma emergente."
+            )
+            stenosisDegree == "severe" -> {
+                if (hasHighRiskFeature) {
+                    Triple(
+                        "Plaque-RADS 4 (Riesgo Crítico)",
+                        Color(0xFFDC2626),
+                        "Estenosis severa (70-94%) CON AL MENOS 1 característica de placa vulnerable/inestable. Riesgo crítico inminente de infarto ipsilateral recurrente. Recomendada Endarterectomía o Stent Carotídeo urgente."
+                    )
+                } else {
+                    Triple(
+                        "Plaque-RADS 3 (Riesgo Alto)",
+                        Color(0xFFEA580C),
+                        "Estenosis severa (70-94%) SIN características de placa inestable adicionales, o estenosis moderada (50-69%) con placas inestables de alto riesgo. Valoración preferencial de revascularización y estatina alta dosis inmediata."
+                    )
+                }
+            }
+            stenosisDegree == "moderate" -> {
+                if (hasHighRiskFeature) {
+                    Triple(
+                        "Plaque-RADS 3 (Riesgo Alto)",
+                        Color(0xFFEA580C),
+                        "Estenosis moderada (50-69%) CON AL MENOS 1 característica de placa vulnerable/inestable visible (p. ej., ulceración o trombo mural). Requiere iniciar manejo médico agresivo inmediato."
+                    )
+                } else {
+                    Triple(
+                        "Plaque-RADS 2 (Riesgo Moderado)",
+                        Color(0xFFD97706),
+                        "Estenosis moderada (50-69%) estable SIN características de inestabilidad, o estenosis leve (<50%) pero con placas de aspecto inestable. Iniciar terapia farmacológica intensiva (LDL < 55 mg/dL)."
+                    )
+                }
+            }
+            else -> {
+                if (hasHighRiskFeature) {
+                    Triple(
+                        "Plaque-RADS 2 (Riesgo Moderado)",
+                        Color(0xFFD97706),
+                        "Estenosis leve (<50%) CON placa vulnerable (ej. IPH o trombo). Tratamiento de prevención con estatinas de alta potencia es fundamental."
+                    )
+                } else {
+                    Triple(
+                        "Plaque-RADS 1 (Riesgo Leve)",
+                        Color(0xFF2563EB),
+                        "Estenosis leve (<50%) con características estables y homogéneas sin signos de inestabilidad o ulceración carotídeas. Tratamiento médico preventivo estándar de factores de riesgo."
+                    )
+                }
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Estratificación de Riesgo Plaque-RADS",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Plaque-RADS (Carotid Plaque Reporting and Data System) estandariza los reportes de angio-TAC carotídea, correlacionando la estenosis con los rasgos vulnerables de la placa.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Stenosis selection
+            Column {
+                Text("Grado de Estenosis Carotídea Luminal:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val degreeOptions = listOf(
+                        "none" to "No Placa",
+                        "mild" to "<50% Leve",
+                        "moderate" to "50-69% Mod.",
+                        "severe" to "70-94% Sev.",
+                        "occlusion" to "95-100% Occl."
+                    )
+                    degreeOptions.forEach { (option, label) ->
+                        val isSel = stenosisDegree == option
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { stenosisDegree = option },
+                            label = { Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                }
+            }
+
+            if (stenosisDegree != "none" && stenosisDegree != "occlusion") {
+                // High risk features checklists
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Características de Placa Vulnerable / Alto Riesgo (HRPFs):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    
+                    val hrList = listOf(
+                        "thrombus" to ("Trombo Mural Adherido" to thrombus),
+                        "ulcer" to ("Ulceración de Placa (cráter luminal >1mm)" to ulceration),
+                        "iph" to ("Hemorragia Intraplaca (IPH) en T1 de alta señal" to iph),
+                        "lrnc" to ("Core Necrótico Lípidico Grande con Capa Delgada" to lrnc),
+                        "remodeling" to ("Remodelado Positivo / Signo de Anillo de Servilleta" to positiveRemodeling)
+                    )
+
+                    hrList.forEach { (id, pair) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    when (id) {
+                                        "thrombus" -> thrombus = !thrombus
+                                        "ulcer" -> ulceration = !ulceration
+                                        "iph" -> iph = !iph
+                                        "lrnc" -> lrnc = !lrnc
+                                        "remodeling" -> positiveRemodeling = !positiveRemodeling
+                                    }
+                                }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = pair.second,
+                                onCheckedChange = { checked ->
+                                    when (id) {
+                                        "thrombus" -> thrombus = checked
+                                        "ulcer" -> ulceration = checked
+                                        "iph" -> iph = checked
+                                        "lrnc" -> lrnc = checked
+                                        "remodeling" -> positiveRemodeling = checked
+                                    }
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.error),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(pair.first, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
+
+            // Plaque-RADS output
+            Surface(
+                color = plaqueRadsResult.second.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, plaqueRadsResult.second.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "CATEGORIZACIÓN DE RIESGO:",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = plaqueRadsResult.second
+                        )
+                        
+                        Surface(
+                            color = plaqueRadsResult.second,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = plaqueRadsResult.first.split(" ")[0],
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = plaqueRadsResult.first,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold),
+                        color = plaqueRadsResult.second
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = plaqueRadsResult.third,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 14.sp
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    val report = """
+                        REPORTE DE ESTRATIFICACIÓN VASCULAR PLAQUE-RADS (CTA CARÓTIDA)
+                        -----------------------------------------------------------
+                        - Categoría Asignada: ${plaqueRadsResult.first}
+                        - Recomendación de Consenso: ${plaqueRadsResult.third}
+                        - Grado de Estenosis Luminal: ${when (stenosisDegree) {
+                            "none" -> "0% (Sin Placa)"
+                            "mild" -> "Leve (<50%)"
+                            "moderate" -> "Moderada (50-69%)"
+                            "severe" -> "Severa (70-94%)"
+                            else -> "Oclusión Subtotal/Total (95-100%)"
+                        }}
+                        - Características Vulnerables Identificadas (HRPFs):
+                          * Trombo Mural: ${if (thrombus) "SÍ" else "NO"}
+                          * Ulceración Luminal: ${if (ulceration) "SÍ" else "NO"}
+                          * Hemorragia Intraplaca (IPH): ${if (iph) "SÍ" else "NO"}
+                          * Core Lipídico con Capa Delgada (LRNC/TRFC): ${if (lrnc) "SÍ" else "NO"}
+                          * Remodelado Positivo / Anillo de Servilleta: ${if (positiveRemodeling) "SÍ" else "NO"}
+                    """.trimIndent()
+                    onCopyClicked("Plaque-RADS CTA", report, "Reporte Plaque-RADS copiado")
+                },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = plaqueRadsResult.second,
+                    contentColor = Color.White
+                )
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text("Copiar Reporte Plaque-RADS", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        }
+    }
+}
+
+fun getGradeDescription(category: String, grade: Int): Pair<String, String> {
+    return when (category) {
+        "A" -> when (grade) {
+            1 -> "Potencialmente causal" to "Estenosis ≥50% o trombo móvil en arteria que suple la zona del infarto agudo."
+            2 -> "Causalidad incierta" to "Estenosis <50% en arteria ipsilateral, o estenosis ≥50% en un territorio que no suple el infarto cortical."
+            3 -> "Improbable relación causal" to "Enfermedad ateroesclerótica presente en vasos distantes o calcificaciones difusas sin repercusión local."
+            0 -> "Ausencia de patología" to "Ausencia total de placas de ateroma en vasos intra o extracraneales correspondientes."
+            else -> "Estudio insuficiente/inexistente" to "Estudios no realizados o incompletos para evaluar ateroesclerosis proximal (ej. sin ultrasonido o angio-TAC)."
+        }
+        "S" -> when (grade) {
+            1 -> "Potencialmente causal" to "Infarto lacunar agudo profundo (<1.5 cm) en el territorio de una arteria perforante compatible con arteriopatía de vaso pequeño."
+            2 -> "Causalidad incierta" to "Leucoaraiosis o lagunas presentes moderadas, pero con características clínicas o topografías atípicas."
+            3 -> "Improbable relación causal" to "Microangiopatía severa difusa pero el infarto agudo es cortical de gran tamaño (etiología cortical clara)."
+            0 -> "Ausencia de patología" to "Sin signos de leucoaraiosis ni lagunas antiguas detectadas en estudios de imagen cerebral avanzadas."
+            else -> "Estudio insuficiente/inexistente" to "Examen de neuroimagen relevante (RM cerebral, TAC de alta resolución) no realizado o insuficiente para clasificar vaso pequeño."
+        }
+        "C" -> when (grade) {
+            1 -> "Potencialmente causal" to "Fuente de alto riesgo cardioembólico presente: Fibrilación Auricular (FA), prótesis valvular, miocardiopatía severa (FEVI <30%), trombo intracavitario activo o IM <4 semanas."
+            2 -> "Causalidad incierta" to "Fuente de mediano/bajo riesgo cardioembólico: Foramen Oval Patente (PFO), prolapso mitral leve, calcificaciones anulares o miocardiópata moderada."
+            3 -> "Improbable relación causal" to "Anomalías menores presentes pero en presencia de otra causa sumamente clara de stroke (ej. oclusión por ateroesclerosis ipsilateral)."
+            0 -> "Ausencia de patología" to "Evaluación cardíaca estructural y de ritmo exhaustiva completamente normal."
+            else -> "Estudio insuficiente/inexistente" to "Electrocardiograma simple, ecocardiograma transtorácico/transesofágico, u HOLTER de 24h no realizados o incompletos."
+        }
+        "O" -> when (grade) {
+            1 -> "Potencialmente causal" to "Etiología rara bien establecida identificada y compatible (ej. vasculitis del SNC, arteriopatías genéticas como CADASIL, RCVS, hipercoagulabilidad severa, SAF)."
+            2 -> "Causalidad incierta" to "Otras etiologías posibles detectadas laboratorialmente pero sin confirmación histológica u clínica suficiente."
+            3 -> "Improbable relación causal" to "Anomalía inmunológica/coagulopatía detectada de bajo perfil pero claramente incidental al cuadro actual."
+            0 -> "Ausencia de patología" to "Sin evidencia alguna de otras patologías tras cribado amplio."
+            else -> "Estudio insuficiente/inexistente" to "Exámenes avanzados (perfil autoinmune, cribado trombofílico, punción de LCR para bandas) no investigados."
+        }
+        "D" -> when (grade) {
+            1 -> "Potencialmente causal" to "Se demuestra de forma clara disección arterial extracraneana o intracraneana en un vaso que distribuye flujo al área del infarto agudo."
+            2 -> "Causalidad incierta" to "Disección demostrada pero en un territorio arterial diferente o disección asintomática crónica con vaso recanalizado."
+            3 -> "Improbable relación causal" to "Disección en vaso contralateral o completamente incidental al parénquima afectado en las imágenes."
+            0 -> "Ausencia de patología" to "Angiografía o angiorresonancia normal sin flap íntimo ni hematoma mural epitelial."
+            else -> "Estudio insuficiente/inexistente" to "Muestreo angiográfico por TAC, RM o cateterismo no realizado para investigar patología mural traumática."
+        }
+        else -> "Desconocido" to ""
+    }
+}
+
+@Composable
+fun ToastEtiologyRow(title: String, desc: String) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 14.sp)
+        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(top = 6.dp))
+    }
+}
+
+@Composable
+fun TabNeuroimagenHIC(onCopyClicked: (String, String, String) -> Unit) {
+    var coreVolume by remember { mutableStateOf(25f) } // Default core volume = 25 mL
+    var perfusionVolume by remember { mutableStateOf(110f) } // Default perfusion = 110 mL
+    var nihssScore by remember { mutableStateOf(14f) } // Default NIHSS = 14
+
+    // HIC Volume variables
+    var hA by remember { mutableStateOf("") }
+    var hB by remember { mutableStateOf("") }
+    var interactiveC by remember { mutableStateOf(false) }
+    var hCManual by remember { mutableStateOf("") }
+    var hThickness by remember { mutableStateOf("5.0") }
+    var hSlices by remember { mutableStateOf(4) }
+    val hScores = remember { mutableStateListOf<Float>().apply { addAll(List(16) { 0.5f }) } }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+
+    // Calculations
+    val penumbraVolume = maxOf(0f, perfusionVolume - coreVolume)
+    
+    val vA = hA.toDoubleOrNull() ?: 0.0
+    val vB = hB.toDoubleOrNull() ?: 0.0
+    val hComputedC = if (interactiveC) {
+        val thicknessCm = (hThickness.toDoubleOrNull() ?: 5.0) / 10.0
+        val sumScores = hScores.take(hSlices).sum()
+        sumScores * thicknessCm
+    } else {
+        hCManual.toDoubleOrNull() ?: 0.0
+    }
+    val hicVolumeVal = (vA * vB * hComputedC) / 2.0
+    val mismatchRatio = if (coreVolume == 0f) {
+        if (perfusionVolume > 0f) 99.9f else 1.0f
+    } else {
+        perfusionVolume / coreVolume
+    }
+
+    val isCoreEligible = coreVolume < 70 // Core < 70 mL
+    val isRatioEligible = mismatchRatio >= 1.8f // Ratio >= 1.8
+    val isPenumbraEligible = penumbraVolume >= 15 // Absolute penumbra volume >= 15 mL
+    val isEligibleDefuse3 = isCoreEligible && isRatioEligible && isPenumbraEligible
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        
+        // CARD 1: SOFTWARE PARAMETERS
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("defuse_software_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(primaryColor, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "PARÁMETROS DEL SOFTWARE (DEFUSE-3 / Mismatch)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Left Column: Sliders
+                    Column(
+                        modifier = Modifier.weight(1.3f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Core Volume Slider
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Volumen Core (DWI)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${coreVolume.toInt()} mL",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFEF4444)
+                                )
+                            }
+                            Slider(
+                                value = coreVolume,
+                                onValueChange = { coreVolume = it },
+                                valueRange = 0f..150f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color(0xFFEF4444),
+                                    activeTrackColor = Color(0xFFEF4444),
+                                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.testTag("core_volume_slider")
+                            )
+                        }
+
+                        // Perfusion Volume Slider
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Volumen Perfusión (Tmax > 6s)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${perfusionVolume.toInt()} mL",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF0D9488)
+                                )
+                            }
+                            Slider(
+                                value = perfusionVolume,
+                                onValueChange = { perfusionVolume = it },
+                                valueRange = 0f..300f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color(0xFF0D9488),
+                                    activeTrackColor = Color(0xFF0D9488),
+                                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.testTag("perfusion_volume_slider")
+                            )
+                        }
+
+                        // NIHSS Slider
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "NIHSS del Paciente",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${nihssScore.toInt()} puntos",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = primaryColor
+                                )
+                            }
+                            Slider(
+                                value = nihssScore,
+                                onValueChange = { nihssScore = it },
+                                valueRange = 0f..42f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = primaryColor,
+                                    activeTrackColor = primaryColor,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.testTag("nihss_slider")
+                            )
+                        }
+                    }
+
+                    // Center Column: ESQUEMA DEL MISMATCH
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(205.dp),
+                        colors = CardDefaults.cardColors(containerColor = surfaceVariantColor.copy(alpha = 0.2f)),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "ESQUEMA DEL MISMATCH",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            Box(
+                                modifier = Modifier.size(110.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val d = size.minDimension
+                                    val radiusMax = d / 2f
+                                    val center = Offset(radiusMax, radiusMax)
+
+                                    val perfFraction = (perfusionVolume / 300f).coerceIn(0.2f, 1.0f)
+                                    val outerRadius = radiusMax * perfFraction
+                                    
+                                    drawCircle(
+                                        color = Color(0xFF0D9488).copy(alpha = 0.08f),
+                                        radius = outerRadius,
+                                        center = center
+                                    )
+                                    
+                                    drawCircle(
+                                        color = Color(0xFF0D9488),
+                                        radius = outerRadius,
+                                        center = center,
+                                        style = Stroke(width = 2.dp.toPx())
+                                    )
+
+                                    val coreFraction = (coreVolume / 300f).coerceIn(0.05f, 0.95f) * perfFraction
+                                    val coreRadius = (radiusMax * coreFraction).coerceAtMost(outerRadius - 4.dp.toPx())
+                                    
+                                    if (coreVolume > 0f) {
+                                        drawCircle(
+                                            color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                            radius = coreRadius,
+                                            center = center
+                                        )
+                                        drawCircle(
+                                            color = Color(0xFFEF4444),
+                                            radius = coreRadius,
+                                            center = center,
+                                            style = Stroke(width = 2.dp.toPx())
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Penumbra", style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D9488)))
+                                    Spacer(modifier = Modifier.height(18.dp))
+                                    if (coreVolume > 0f) {
+                                        Text("Core", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444)))
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Text("Core: ${coreVolume.toInt()} mL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                Text("Penumbra: ${penumbraVolume.toInt()} mL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0D9488))
+                            }
+                        }
+                    }
+
+                    // Right Column: MISMATCH RATIO & ELIGIBILITY
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("RATIO DE MISMATCH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (mismatchRatio >= 99f) "INDET" else String.format("%.2fx", mismatchRatio),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isRatioEligible) Color(0xFF0D9488) else Color(0xFFEF4444)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text("*Meta de selección de penumbra >= 1.8", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isEligibleDefuse3) Color(0xFFE6F4EA) else Color(0xFFFCE8E6)
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isEligibleDefuse3) Color(0xFF137333).copy(alpha = 0.4f) else Color(0xFFC5221F).copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = if (isEligibleDefuse3) "ELEGIBLE SEGÚN DEFUSE-3" else "NO ELEGIBLE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isEligibleDefuse3) Color(0xFF137333) else Color(0xFFC5221F)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isEligibleDefuse3) {
+                                        "Cumple criterios: Core < 70 mL, ratio de mismatch >= 1.8 y volumen de penumbra absoluta >= 15 mL. Indicada la trombectomía mecánica en ventana de 6-16 horas."
+                                    } else {
+                                        "No cumple criterios DEFUSE-3: " + when {
+                                            !isCoreEligible -> "Volumen Core >= 70 mL."
+                                            !isRatioEligible -> "Ratio de mismatch < 1.8."
+                                            else -> "Volumen de penumbra absoluta < 15 mL."
+                                        }
+                                    },
+                                    fontSize = 9.sp,
+                                    color = if (isEligibleDefuse3) Color(0xFF137333) else Color(0xFFC5221F),
+                                    lineHeight = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 2: ANATOMICAL CORRELATION HIC
+        Text(
+            "Correlación Anatómica: HIC Hipertensiva vs. Lobar (AAC)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = primaryColor,
+            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+        )
+        Text(
+            "Haga clic en las diferentes áreas del cerebro del esquema coronal para revisar las características diferenciales y los criterios diagnósticos internacionales de Boston v2.0 (2022).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+            lineHeight = 14.sp
+        )
+
+        var selectedAnatomyZone by remember { mutableStateOf("profunda") }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("hic_correlon_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(180.dp)
+                            .background(surfaceVariantColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTapGestures { offset ->
+                                        val w = this.size.width.toFloat()
+                                        val h = this.size.height.toFloat()
+                                        val x = offset.x
+                                        val y = offset.y
+
+                                        if (x in (w * 0.28f)..(w * 0.45f) && y in (h * 0.42f)..(h * 0.68f)) {
+                                            selectedAnatomyZone = "profunda"
+                                        } else if (x in (w * 0.58f)..(w * 0.85f) && y in (h * 0.22f)..(h * 0.52f)) {
+                                            selectedAnatomyZone = "lobar"
+                                        } else if (y < h * 0.35f && x < w * 0.48f) {
+                                            selectedAnatomyZone = "css"
+                                        } else {
+                                            selectedAnatomyZone = "epvs"
+                                        }
+                                    }
+                                }
+                        ) {
+                            val w = size.width
+                            val h = size.height
+
+                            val brainPath = Path().apply {
+                                moveTo(w * 0.30f, h * 0.90f)
+                                lineTo(w * 0.30f, h * 0.82f)
+                                cubicTo(w * 0.15f, h * 0.80f, w * 0.08f, h * 0.55f, w * 0.10f, h * 0.40f)
+                                cubicTo(w * 0.12f, h * 0.15f, w * 0.88f, h * 0.15f, w * 0.90f, h * 0.40f)
+                                cubicTo(w * 0.92f, h * 0.55f, w * 0.85f, h * 0.80f, w * 0.70f, h * 0.82f)
+                                lineTo(w * 0.70f, h * 0.90f)
+                                close()
+                            }
+                            
+                            drawPath(
+                                path = brainPath,
+                                color = Color(0xFFF1F5F9)
+                            )
+                            drawPath(
+                                path = brainPath,
+                                color = Color(0xFFCBD5E1),
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+
+                            val leftVentPath = Path().apply {
+                                moveTo(w * 0.48f, h * 0.48f)
+                                cubicTo(w * 0.45f, h * 0.42f, w * 0.42f, h * 0.48f, w * 0.46f, h * 0.52f)
+                                close()
+                            }
+                            val rightVentPath = Path().apply {
+                                moveTo(w * 0.52f, h * 0.48f)
+                                cubicTo(w * 0.55f, h * 0.42f, w * 0.58f, h * 0.48f, w * 0.54f, h * 0.52f)
+                                close()
+                            }
+                            drawPath(leftVentPath, Color(0xFF94A3B8))
+                            drawPath(rightVentPath, Color(0xFF94A3B8))
+
+                            val profundaSelected = selectedAnatomyZone == "profunda"
+                            drawCircle(
+                                color = if (profundaSelected) Color(0xFFEF4444).copy(alpha = 0.3f) else Color(0xFF941C1C).copy(alpha = 0.1f),
+                                radius = 22.dp.toPx(),
+                                center = Offset(w * 0.32f, h * 0.52f)
+                            )
+                            drawCircle(
+                                color = Color(0xFF941C1C),
+                                radius = 12.dp.toPx(),
+                                center = Offset(w * 0.32f, h * 0.52f)
+                            )
+
+                            val lobarSelected = selectedAnatomyZone == "lobar"
+                            val lobarPath = Path().apply {
+                                moveTo(w * 0.72f, h * 0.42f)
+                                lineTo(w * 0.85f, h * 0.35f)
+                                lineTo(w * 0.82f, h * 0.54f)
+                                close()
+                            }
+                            drawPath(
+                                path = lobarPath,
+                                color = if (lobarSelected) Color(0xFF0284C7).copy(alpha = 0.4f) else Color(0xFF0284C7).copy(alpha = 0.15f)
+                            )
+                            drawPath(
+                                path = lobarPath,
+                                color = Color(0xFF0284C7),
+                                style = Stroke(width = 2.5.dp.toPx())
+                            )
+
+                            val cssSelected = selectedAnatomyZone == "css"
+                            val cssPath = Path().apply {
+                                moveTo(w * 0.22f, h * 0.28f)
+                                cubicTo(w * 0.26f, h * 0.22f, w * 0.36f, h * 0.19f, w * 0.46f, h * 0.20f)
+                            }
+                            drawPath(
+                                path = cssPath,
+                                color = Color(0xFFEAB308),
+                                style = Stroke(
+                                    width = if (cssSelected) 5.dp.toPx() else 3.dp.toPx(),
+                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f))
+                                )
+                            )
+
+                            val epvsSelected = selectedAnatomyZone == "epvs"
+                            val epvsColor = if (epvsSelected) primaryColor else Color(0xFF64748B)
+                            val epvsStroke = if (epvsSelected) 3.dp.toPx() else 1.5.dp.toPx()
+                            drawLine(epvsColor, Offset(w * 0.64f, h * 0.60f), Offset(w * 0.68f, h * 0.54f), strokeWidth = epvsStroke)
+                            drawLine(epvsColor, Offset(w * 0.68f, h * 0.64f), Offset(w * 0.72f, h * 0.58f), strokeWidth = epvsStroke)
+                            drawLine(epvsColor, Offset(w * 0.60f, h * 0.64f), Offset(w * 0.64f, h * 0.58f), strokeWidth = epvsStroke)
+
+                            drawRect(
+                                color = Color(0xFFE2E8F0),
+                                topLeft = Offset(w * 0.65f, h * 0.05f),
+                                size = Size(w * 0.30f, h * 0.12f)
+                            )
+                        }
+
+                        Text(
+                            "INTERACTIVO",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        listOf(
+                            "lobar" to "Hemorragia Lobar",
+                            "profunda" to "Hemorragia Profunda",
+                            "css" to "Siderosis cSS",
+                            "epvs" to "Espacios ePVS"
+                        ).forEach { (id, label) ->
+                            val active = selectedAnatomyZone == id
+                            Button(
+                                onClick = { selectedAnatomyZone = id },
+                                modifier = Modifier.fillMaxWidth().height(36.dp).testTag("hic_zone_pill_$id"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (active) {
+                                        when (id) {
+                                            "lobar" -> Color(0xFF0284C7)
+                                            "profunda" -> Color(0xFF941C1C)
+                                            "css" -> Color(0xFFEAB308)
+                                            else -> primaryColor
+                                        }
+                                    } else surfaceVariantColor,
+                                    contentColor = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                val zoneDetails = when (selectedAnatomyZone) {
+                    "lobar" -> Triple(
+                        "Hemorragia de Lóbulos Cerebrales (Lobar)",
+                        "Lobar / Angiopatía Amiloide (AAC)",
+                        "Ocurre típicamente en la interfase cortico-subcortical de los lóbulos cerebrales (parietal, occipital). Su causa fundamental es la degeneración y depósito de amiloide-beta en la túnica media y adventicia de vasos pequeños y medianos de la corteza y leptomeninges. Criterios de Boston v2.0 (2022) validados: requiere edad >= 50 años, hemorragias lobares múltiples o lobar + siderosis cortical sin causas alternativas."
+                    )
+                    "profunda" -> Triple(
+                        "Hemorragia de Estructuras Profundas",
+                        "Hipertensiva / Arteriolosclerosis",
+                        "Ocurre típicamente en los ganglios basales, tálamo, cerebelo o protuberancia. Su causa fundamental es la arteriolosclerosis concéntrica debido a hipertensión arterial crónica descontrolada de larga evolución. Posee menor tasa de recurrencia espontánea comparada con la lobar."
+                    )
+                    "css" -> Triple(
+                        "Siderosis Cortical Superficial (cSS) en Surcos",
+                        "Marcador Patognomónico de AAC",
+                        "Consiste en el depósito crónico de hemosiderina en los surcos cerebrales supra-tentoriales sin compromiso del parénquima subyacente. Es un potente biomarcador de fragilidad vascular secundaria a Angiopatía Amiloide Cerebral (AAC) y predice fuertemente un elevado riesgo de recurrencia de hemorragia lobar."
+                    )
+                    "epvs" -> Triple(
+                        "Espacios Perivasculares Expandidos (ePVS)",
+                        "Marcador de Microangiopatía",
+                        "Espacios de Virchow-Robin dilatados visibles en RM (T2). Cuando son severos en el centrum semiovale, se asocian clásicamente con AAC; mientras que su predominio en los ganglios basales correlaciona fuertemente con enfermedad de pequeño vaso hipertensiva (arteriolosclerosis profunda)."
+                    )
+                    else -> Triple("", "", "")
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth().testTag("hic_anatomy_details_card")
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = zoneDetails.first,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Surface(
+                                color = when (selectedAnatomyZone) {
+                                    "lobar" -> Color(0xFFE0F2FE)
+                                    "profunda" -> Color(0xFFFCE8E6)
+                                    "css" -> Color(0xFFFEF9C3)
+                                    else -> MaterialTheme.colorScheme.primaryContainer
+                                },
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = zoneDetails.second,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when (selectedAnatomyZone) {
+                                        "lobar" -> Color(0xFF0369A1)
+                                        "profunda" -> Color(0xFFC5221F)
+                                        "css" -> Color(0xFF854D0E)
+                                        else -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    },
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = zoneDetails.third,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 14.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                onCopyClicked(
+                                    "CORRELACIÓN HIC (${zoneDetails.first})",
+                                    "Tipo de Hallazgo: ${zoneDetails.second}",
+                                    zoneDetails.third
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth().height(36.dp).testTag("copy_hic_correlation_btn"),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copiar Hallazgos a Portapapeles", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 3: ELIPSOIDE VOLUME CALCULATOR (Alto x Ancho x Grosor / 2)
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("hic_volume_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(primaryColor, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Calculadora de Volumen Elipsoide (ABC/2)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = primaryColor
+                    )
+                }
+
+                Text(
+                    text = "Estime el volumen del hematoma intraparenquimatoso asumiendo una forma tridimensional elipsoide (Alto × Ancho × Grosor / 2) basándose en cortes axiales de Tomografía Computarizada (TAC) sin contraste.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = hA,
+                        onValueChange = { hA = it },
+                        label = { Text("A: Alto / Mayor (cm)", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = { Text("Ej. 4.5", fontSize = 10.sp) }
+                    )
+                    OutlinedTextField(
+                        value = hB,
+                        onValueChange = { hB = it },
+                        label = { Text("B: Ancho / Diám Perp (cm)", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = { Text("Ej. 3.2", fontSize = 10.sp) }
+                    )
+                }
+                Text(
+                    text = "A es la dimensión axial máxima del sangrado en el corte principal. B es perpendicular a A en la misma sección corte.",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Selector: manual vs. interactive C
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(surfaceVariantColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        false to "Manual C (Grosor)",
+                        true to "Corte C Interactivo"
+                    ).forEach { (isInter, label) ->
+                        val isSel = interactiveC == isInter
+                        val btnBg = if (isSel) primaryColor else Color.Transparent
+                        val btnTextColor = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        
+                        Surface(
+                            onClick = { interactiveC = isInter },
+                            shape = RoundedCornerShape(6.dp),
+                            color = btnBg,
+                            modifier = Modifier.weight(1f).height(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = btnTextColor)
+                            }
+                        }
+                    }
+                }
+
+                if (!interactiveC) {
+                    OutlinedTextField(
+                        value = hCManual,
+                        onValueChange = { hCManual = it },
+                        label = { Text("C: Grosor total vertical (cm)", fontSize = 10.sp) },
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        placeholder = { Text("Ej. 3.0", fontSize = 10.sp) }
+                    )
+                    Text(
+                        text = "El grosor total se calcula multiplicando el número de cortes con sangre visible por el espesor del corte de la TAC. Ej: 6 cortes de 5mm = 3.0 cm.",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = surfaceVariantColor.copy(alpha = 0.2f)),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Grosor de corte (TAC):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                        listOf("2.5", "5.0", "10.0").forEach { valThk ->
+                                            val isSel = hThickness == valThk
+                                            Surface(
+                                                onClick = { hThickness = valThk },
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (isSel) primaryColor else surfaceVariantColor,
+                                                modifier = Modifier.weight(1f).height(28.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text("${valThk} mm", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Cortes con sangre:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.padding(top = 4.dp).height(28.dp).fillMaxWidth().background(surfaceVariantColor, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp)
+                                    ) {
+                                        IconButton(
+                                            onClick = { if (hSlices > 1) hSlices-- },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text("$hSlices", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                                        IconButton(
+                                            onClick = { if (hSlices < 16) hSlices++ },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text("Califique la atenuación de sangre por corte (frente al área máxima):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                            
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                for (i in 0 until hSlices) {
+                                    val score = hScores.getOrNull(i) ?: 0.5f
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Corte ${i + 1}:", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, modifier = Modifier.width(60.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                                            listOf(
+                                                1.0f to "≥75% (1.0)",
+                                                0.5f to "25%-75% (0.5)",
+                                                0.0f to "<25% (0.0)"
+                                            ).forEach { (scoreVal, label) ->
+                                                val isSel = score == scoreVal
+                                                Surface(
+                                                    onClick = {
+                                                        while (hScores.size <= i) {
+                                                            hScores.add(0.5f)
+                                                        }
+                                                        hScores[i] = scoreVal
+                                                    },
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (isSel) primaryColor.copy(alpha = 0.9f) else surfaceVariantColor,
+                                                    modifier = Modifier.weight(1f).height(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            val sumPoints = hScores.take(hSlices).sum()
+                            Text(
+                                text = "Suma de coeficientes: $sumPoints | C calculado = $sumPoints x (${hThickness}mm/10) = ${"%.2f".format(hComputedC)} cm",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = primaryColor,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Surface(
+                    color = if (hicVolumeVal >= 30.0) Color(0xFFFEF2F2) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, if (hicVolumeVal >= 30.0) Color(0xFFFCA5A5) else primaryColor.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Volumen Estimado del Hematoma (Fórmula Elipsoide):",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hicVolumeVal >= 30.0) Color(0xFF991B1B) else primaryColor
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${"%.2f".format(hicVolumeVal)} mL / cc",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                            color = if (hicVolumeVal >= 30.0) Color(0xFFDC2626) else MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val sWarning = if (hicVolumeVal >= 30.0) {
+                            "⚠️ CRÍTICO (≥ 30 mL): Predictor principal de alta mortalidad a los 30 días, alto riesgo de herniación hernio-cisternales y compresión cerebral. Requiere interconsulta prioritaria con Neurocirugía para descompresión."
+                        } else if (hicVolumeVal > 0.0) {
+                            "Moderado / Pequeño (< 30 mL): Indicación general de manejo médico agresivo en terapia de cuidados intensivos, control estricto de la PIC tensional y vigilancia neurológica horaria."
+                        } else {
+                            "Ingrese las dimensiones estimadas del hematoma en TAC para iniciar el modelado."
+                        }
+                        Text(
+                            text = sWarning,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (hicVolumeVal >= 30.0) Color(0xFF7F1D1D) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Button(
+                    onClick = {
+                        val report = buildString {
+                            append("REPORTE CLÍNICO DE VOLUMEN HIC (Fórmula Elipsoide ABC/2)\n")
+                            append("====================================================\n")
+                            append("• Diámetro A (Alto): ${"%.2f".format(vA)} cm\n")
+                            append("• Diámetro B (Ancho): ${"%.2f".format(vB)} cm\n")
+                            append("• Diámetro C (Grosor/Corte): ${"%.2f".format(hComputedC)} cm (${if (interactiveC) "Muestreo interactivo rodajas de TAC" else "Valor manual"})\n")
+                            append("• Volumen Total Calculado: ${"%.2f".format(hicVolumeVal)} cc/mL (Fórmula ABC/2)\n")
+                            append("• Severidad Clinica: ${if (hicVolumeVal >= 30.0) "VOLUMEN CRÍTICO (>=30 mL)" else "Moderada (<30 mL)"}\n\n")
+                            append("Indicaciones aproximadas recomendadas:\n")
+                            if (hicVolumeVal >= 30.0) {
+                                append("- Consulta neuroquirúrgica prioritaria por inminente compromiso de fosa posterior/supratentorial.\n")
+                            } else if (hicVolumeVal > 0.0) {
+                                append("- Vigilancia de escala de Glasgow, meta de PAS de 130-140 mmHg y control de hematoma.\n")
+                            }
+                        }
+                        onCopyClicked(
+                            "Volumen HIC ABC/2",
+                            report,
+                            "Reporte de Volumen HIC copiado"
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(42.dp).testTag("copy_hic_volume_report")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Copiar Reporte Volumen HIC", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TabNeuroOftalmoIntegration(onCopyClicked: (String, String, String) -> Unit) {
+    var gazeValue by remember { mutableStateOf(0f) } // -100 to 100
+    var oinType by remember { mutableStateOf("normal") } // "normal", "left", "right"
+    var selectedV1Lesion by remember { mutableStateOf("v1_posterior") } // for the field perimetry
+
+    val infiniteTransition = rememberInfiniteTransition()
+    val nystagmusTick by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // CARD 1: EYE MOVEMENT SIMULATOR
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("oin_simulator_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Main title with icon
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Simulador Dinámico de Movimientos Oculares y OIN",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Text(
+                    text = "Mueva el slider de dirección de mirada de izquierda a derecha. Simule los diferentes estados de afectación del Fascículo Longitudinal Medial (FLM): Normal, OIN Izquierda, u OIN Derecha para entender el sustrato anatómico pontino dorsomedial.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Left Column: Parameters
+                    Column(
+                        modifier = Modifier.weight(1.2f),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = "SELECCIONAR LESIÓN",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        listOf(
+                            Triple("normal", "Mirada Fisiológica (Normal)", "Movimientos coordinados bilaterales"),
+                            Triple("left", "Lesión FLM Izquierdo (OIN Izq)", "Falla aducción ojo izq al mirar a la derecha"),
+                            Triple("right", "Lesión FLM Derecho (OIN Der)", "Falla aducción ojo der al mirar a la izquierda")
+                        ).forEach { (id, label, subtext) ->
+                            val isSelected = oinType == id
+                            val bgColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+                            val borderCol = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { 
+                                        oinType = id
+                                        gazeValue = 0f
+                                    }
+                                    .testTag("oin_type_btn_$id"),
+                                colors = CardDefaults.cardColors(containerColor = bgColor),
+                                border = BorderStroke(1.dp, borderCol),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = subtext,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Slider
+                        Column {
+                            val gazeText = if (gazeValue > 10f) "Derecha" else if (gazeValue < -10f) "Izquierda" else "Centro"
+                            Text(
+                                text = "Dirección de la Mirada: $gazeText",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Slider(
+                                value = gazeValue,
+                                onValueChange = { gazeValue = it },
+                                valueRange = -100f..100f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.testTag("gaze_slider")
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Mirar Izquierda", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
+                                Text("Centro", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
+                                Text("Mirar Derecha", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+
+                    // Right Column: The actual eyeballs display and description
+                    Column(
+                        modifier = Modifier.weight(1.5f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Eye movement visualizer box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF030712), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFF1F2937), RoundedCornerShape(16.dp))
+                                .padding(vertical = 16.dp, horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Calculate shifts in Dp
+                                val maxShift = 14f
+                                val baseShift = (gazeValue / 100f) * maxShift
+                                var leftShiftDp = baseShift.dp
+                                var rightShiftDp = baseShift.dp
+
+                                if (oinType == "left" && gazeValue > 0f) {
+                                    leftShiftDp = 0.dp // fails to adduct
+                                    val nystagmoValue = sin(nystagmusTick * 1.5f) * 3f
+                                    rightShiftDp = (baseShift + nystagmoValue).dp // oscillates
+                                } else if (oinType == "right" && gazeValue < 0f) {
+                                    rightShiftDp = 0.dp // fails to adduct
+                                    val nystagmoValue = sin(nystagmusTick * 1.5f) * 3f
+                                    leftShiftDp = (baseShift + nystagmoValue).dp // oscillates
+                                }
+
+                                Eyeball(label = "OJO IZQUIERDO", horizontalOffset = leftShiftDp)
+                                Eyeball(label = "OJO DERECHO", horizontalOffset = rightShiftDp)
+                            }
+                        }
+
+                        // Anatomical description Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "ANATOMOPATOLOGÍA DE LA OIN",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = when (oinType) {
+                                        "normal" -> "La mirada conjugada lateral es fisiológica. El núcleo del VI par estimula de forma coordinada el recto externo del ojo abductor y el recto interno del aductor contralateral."
+                                        "left" -> "Lesión del FLM Izquierdo. Al intentar mirar a la derecha (activación del VI par derecho), la señal no cruza al III par izquierdo. El ojo izquierdo no puede aducir y el ojo derecho (abductor) genera nistagmo compensatorio."
+                                        "right" -> "Lesión del FLM Derecho. Al intentar mirar a la izquierda (activación del VI par izquierdo), la señal no cruza al III par derecho. El ojo derecho no puede aducir y el ojo izquierdo abduce con nistagmo de resorte."
+                                        else -> ""
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 2: FIELD PERIMETRY SIMULATOR
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("perimetry_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Perimetría en Infarto de ACP (Campo Visual)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Text(
+                    text = "El 96% de los defectos campimétricos aislados de un hemicampo predicen correctamente la lateralidad del infarto occipital en RM cerebral. Simule los diferentes patrones a continuación:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left Column: Options list
+                    Column(
+                        modifier = Modifier.weight(1.2f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "v1_posterior" to Pair("Calcarina Posterior / Polo occipital", "Preservación macular (Macular Sparing)"),
+                            "cuneus" to Pair("Cuña Inferior de V1", "Cuadrantanopsia superior contralateral homónima"),
+                            "meyer" to Pair("Radiaciones ópticas (Meyer)", "Pie en el cielo (Lóbulo temporal posterior)"),
+                            "v1_bilateral" to Pair("V1 Bilateral Completo", "Ceguera cortical (Síndrome de Anton)")
+                        ).forEach { (id, pair) ->
+                            val isSelected = selectedV1Lesion == id
+                            val bgColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+                            val borderCol = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedV1Lesion = id }
+                                    .testTag("perimetry_type_btn_$id"),
+                                colors = CardDefaults.cardColors(containerColor = bgColor),
+                                border = BorderStroke(1.dp, borderCol),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = pair.first,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = pair.second,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Center Column: Interactive visual field circles drawing
+                    Row(
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp), RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("CAMPO IZQ", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            VisualFieldCircle(side = "left", lesionType = selectedV1Lesion)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("CAMPO DER", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            VisualFieldCircle(side = "right", lesionType = selectedV1Lesion)
+                        }
+                    }
+
+                    // Right Column: Explanation text
+                    Card(
+                        modifier = Modifier.weight(1.1f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = "ANÁLISIS CLÍNICO",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = when (selectedV1Lesion) {
+                                    "v1_posterior" -> "Macular Sparing (Preservación):\nLa porción macular distal de la corteza calcarina posee un doble aporte vascular anastomótico procedente de las ramas distales de la ACM y la ACP. Característico de origen vascular isquémico."
+                                    "cuneus" -> "Cuadrantanopsia Superior:\nInfartos localizados estrictamente en la pared inferior del surco calcarino (giro lingual) o cuña inferior de la corteza V1."
+                                    "meyer" -> "\"Pie en el Cielo\":\nLa afectación del bucle o asa de Meyer en la profundidad del lóbulo temporal posterior desconecta de manera selectiva las radiaciones ópticas inferiores."
+                                    "v1_bilateral" -> "Ceguera Cortical & S. de Anton:\nOclusión de la punta de la basilar que condiciona infarto cortical occipital bilateral. El paciente niega la ceguera por compromiso de las fibras asociativas (Anosognosia)."
+                                    else -> ""
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CARD 3: THE ORIGINAL PUPILLAR SPARING INFO CARD
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("pupilar_sparing_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Parálisis Ocular y Pupilar Sparing",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                BulletPoint("III Par Craneal Isquémico (Diabetes/HTA)", "Frecuentemente preserva la función pupilar (Pupil Sparing) debido a que las fibras parasimpáticas corren superficialmente y no son afectadas por microinfartos de la vasa vasorum central.")
+                BulletPoint("III Par Craneal Compresivo (Aneurisma de ACM/Hernia)", "Compromiso pupilar agudo ipsilateral (midriasis arreactiva unilateral) debido a la compresión extrínseca física directa de las fibras parasimpáticas superficiales.")
+                BulletPoint("Síndrome de Horner Clínico", "Triada patognomónica de miosis ipsilateral, ptosis parcial superior y anhidrosis facial debido a disrupción de la cadena simpática cervical de tres neuronas.")
+            }
+        }
+    }
+}
+
+@Composable
+fun Eyeball(label: String, horizontalOffset: androidx.compose.ui.unit.Dp) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp)) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF64748B),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Box(
+            modifier = Modifier
+                .size(90.dp)
+                .background(Color.White, CircleShape)
+                .border(4.dp, Color(0xFFE2E8F0), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = horizontalOffset)
+                    .size(52.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Iris
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF006074), CircleShape)
+                )
+                // Pupil
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(Color(0xFF020617), CircleShape)
+                )
+                // Reflection glare
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 11.dp, top = 11.dp)
+                        .size(6.dp)
+                        .background(Color.White, CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun VisualFieldCircle(side: String, lesionType: String) {
+    Canvas(
+        modifier = Modifier
+            .size(76.dp)
+            .background(Color.White, CircleShape)
+            .border(2.dp, Color(0xFF94A3B8), CircleShape)
+    ) {
+        val w = size.width
+        val h = size.height
+        val c = Offset(w / 2f, h / 2f)
+
+        drawLine(Color(0xFFCBD5E1), Offset(w / 2f, 0f), Offset(w / 2f, h), strokeWidth = 1.5f)
+        drawLine(Color(0xFFCBD5E1), Offset(0f, h / 2f), Offset(w, h / 2f), strokeWidth = 1.5f)
+
+        val shadeColor = Color(0xFF1E293B).copy(alpha = 0.85f)
+
+        when (lesionType) {
+            "v1_posterior" -> {
+                drawRect(
+                    color = shadeColor,
+                    topLeft = Offset(0f, 0f),
+                    size = Size(w / 2f, h)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = w * 0.18f,
+                    center = c
+                )
+                drawCircle(
+                    color = Color(0xFF006074),
+                    radius = w * 0.18f,
+                    center = c,
+                    style = Stroke(width = 1f)
+                )
+            }
+            "cuneus" -> {
+                drawRect(
+                    color = shadeColor,
+                    topLeft = Offset(0f, 0f),
+                    size = Size(w / 2f, h / 2f)
+                )
+            }
+            "meyer" -> {
+                drawRect(
+                    color = shadeColor,
+                    topLeft = Offset(0f, 0f),
+                    size = Size(w / 2f, h / 2f)
+                )
+            }
+            "v1_bilateral" -> {
+                drawCircle(
+                    color = shadeColor,
+                    radius = w / 2f,
+                    center = c
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TabPoblacionesEspeciales(onCopyClicked: (String, String, String) -> Unit) {
+    var youngAps by remember { mutableStateOf(false) }
+    var youngCadasil by remember { mutableStateOf(false) }
+    var youngFabry by remember { mutableStateOf(false) }
+    var youngHomocysteine by remember { mutableStateOf(false) }
+    var youngMelas by remember { mutableStateOf(false) }
+    var youngVasculitis by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("trials_cohort_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "Estudios Poblacionales de Reperfusión Aguda (6-24h)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Comparación analítica de criterios de inclusión y poblaciones reclutadas en los ensayos clínicos pivotales que expandieron la ventana terapéutica para trombectomía mecánica.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+                
+                Spacer(modifier = Modifier.height(14.dp))
+
+                TrialComparisonCard(
+                    title = "Ensayos DAWN (6-24 Horas)",
+                    population = "Población: 206 pacientes con oclusión de ICA o segmento M1 de ACM.",
+                    criteria = "Severidad neurológica desproporcionada con el tamaño del infarto (NIHSS >= 10 combinada con core de infarto pequeño por TC-perfusión/RM).",
+                    intervention = "Trombectomía mecánica endovascular más cuidado médico estándar frente a cuidado médico estándar exclusivo.",
+                    implication = "Demostró una sustancial reducción en la discapacidad funcional global a los 90 días (tasa de independencia del 49% vs 13% en el brazo control). Expandió formalmente la ventana de rescate endovascular hasta las 24 horas selectivamente ante mismatch clínico-radiológico."
+                )
+
+                TrialComparisonCard(
+                    title = "Ensayo DEFUSE-3 (6-16 Horas)",
+                    population = "Población: 182 pacientes con oclusión proximal anterior (ICA o M1) con última hora visto normal entre 6 y 16 horas.",
+                    criteria = "Volumen de core isquémico basal < 70 mL en perfusión automatizada, ratio de mismatch Perfusión/Core >= 1.8, y volumen absoluto de tejido en penumbra >= 15 mL.",
+                    intervention = "Trombectomía mecánica endovascular más terapia médica convencional en comparación con terapia médica sola.",
+                    implication = "Evidenció un beneficio funcional extraordinario (mRS 0-2 de 45% vs 17% ) y una mortalidad inferior a 90 días (14% vs 26%). Ratifica el uso de mismatch por software automatizado (RAPID) para validar intervención endovascular en ventana de hasta 16 horas."
+                )
+
+                TrialComparisonCard(
+                    title = "Ensayos EXTEND-IA / ESCAPE (<12h)",
+                    population = "Población: Pacientes hiperagudos/agudos seleccionados con oclusión anterior proximal.",
+                    criteria = "Estudio con colaterales arteriales piales robustas (moderadas a excelentes en Angio-TC multifásica) y ASPECTS cerebral basal >= 6.",
+                    intervention = "Recanalización endovascular hipertemprana frente a manejo estándar sistémico.",
+                    implication = "Demostró que la presencia de una circulación colateral robusta retrasa la conversión a infarto irreversible, optimiza enormemente el área de rescate y reduce de forma crítica la tasa de transformación hemorrágica de reperfusión."
+                )
+
+                TrialComparisonCard(
+                    title = "Ensayo WAKE-UP (Inicio Desconocido / Del Despertar)",
+                    population = "Población: 503 pacientes con ACV isquémico cuyo inicio de síntomas fue desconocido u ocurrido durante el sueño.",
+                    criteria = "Presencia de mismatch o discordancia en RM (lesión con DWI positiva pero con FLAIR todavía negativa, indicando infarto hiperagudo < 4.5 horas).",
+                    intervention = "Trombolisis intravenosa guiada por RM con alteplasa (0.9 mg/kg) frente a placebo.",
+                    implication = "Habilita de forma segura y eficaz la administración de alteplasa (mRS 0-1 a 90 días de 53% vs 42%) en pacientes excluidos por criterio temporal estándar. Convierte la discordancia DWI-FLAIR en el estándar para estimar hiperagudeza de lesión."
+                )
+
+                TrialComparisonCard(
+                    title = "Ensayo RE-SPECT ESUS (Dabigatrán en ESUS)",
+                    population = "Población: 5390 pacientes con stroke isquémico tipo ESUS (Embolic Stroke of Undetermined Source) reciente sin FA.",
+                    criteria = "ACV isquémico embólico no lacunar sin estenosis arterial proximal significativa (>50%) ni fuente cardioembólica mayor definida.",
+                    intervention = "Anticoagulación con dabigatrán (150 mg o 110 mg dos veces al día) frente a Ácido Acetilsalicílico (Aspirina) 100 mg una vez al día.",
+                    implication = "Dabigatrán NO redujo la recurrencia de ACV frente a la aspirina y mantuvo un riesgo de sangrado mayor similar. Refuerza firmemente la recomendación de NO anticoagular empíricamente el ESUS en ausencia de una indicación mayor."
+                )
+
+                TrialComparisonCard(
+                    title = "Ensayo NAVIGATE ESUS (Rivaroxabán en ESUS)",
+                    population = "Población: 7213 pacientes que presentaron un ACV embólico de origen indeterminado (ESUS) reciente.",
+                    criteria = "Diagnóstico verificado de ESUS con exclusión de patología carotídea ipsilateral de alto grado (>50%) y arritmias auriculares.",
+                    intervention = "Anticoagulación con rivaroxabán 15 mg diarios frente a Ácido Acetilsalicílico 100 mg diarios.",
+                    implication = "El estudio fue SUSPENDIDO PREMATURAMENTE debido a nula eficacia preventiva combinada con un aumento inaceptable e independiente en el riesgo de sangrado mayor y hemorragia intracraneana. Se contraindica formalmente el uso de Rivaroxabán en ESUS de manera empírica."
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("young_stroke_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Protocolo Diagnóstico Ampliado en el ACV del Joven",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "El ACV en menores de 50 años requiere un despistaje exhaustivo de trombofilias, conectivopatías, vasculitis y síndromes metabólico-mitocondriales inusuales.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1.2f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "SOSPECHA DE ETIOLOGÍA",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        listOf(
+                            "youngAps" to "Síndrome Antifosfolípido (SAF)",
+                            "youngCadasil" to "CADASIL (Gen NOTCH3)",
+                            "youngFabry" to "Enfermedad de Fabry (Gen GLA)",
+                            "youngHomocysteine" to "Homocistinuria / Hiperhomocisteinemia",
+                            "youngMelas" to "Síndrome MELAS (Genética mitocondrial)",
+                            "youngVasculitis" to "Vasculitis Primaria del SNC (PACNS)"
+                        ).forEach { (id, label) ->
+                            val isChecked = when (id) {
+                                "youngAps" -> youngAps
+                                "youngCadasil" -> youngCadasil
+                                "youngFabry" -> youngFabry
+                                "youngHomocysteine" -> youngHomocysteine
+                                "youngMelas" -> youngMelas
+                                "youngVasculitis" -> youngVasculitis
+                                else -> false
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        when (id) {
+                                            "youngAps" -> youngAps = !youngAps
+                                            "youngCadasil" -> youngCadasil = !youngCadasil
+                                            "youngFabry" -> youngFabry = !youngFabry
+                                            "youngHomocysteine" -> youngHomocysteine = !youngHomocysteine
+                                            "youngMelas" -> youngMelas = !youngMelas
+                                            "youngVasculitis" -> youngVasculitis = !youngVasculitis
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        when (id) {
+                                            "youngAps" -> youngAps = checked
+                                            "youngCadasil" -> youngCadasil = checked
+                                            "youngFabry" -> youngFabry = checked
+                                            "youngHomocysteine" -> youngHomocysteine = checked
+                                            "youngMelas" -> youngMelas = checked
+                                            "youngVasculitis" -> youngVasculitis = checked
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp).testTag("young_cb_$id")
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier.weight(1.5f),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "ESTUDIOS DIRIGIDOS RECOMENDADOS",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            var hasAnySuspect = false
+
+                            if (youngAps) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Estudio de Antifosfolípido (SAF)",
+                                    detail = "Petición de anticoagulante lúpico, anticuerpos anticardiolipina y anti-β2-glicoproteína I (repetir en 12 semanas para confirmar triple positividad). El ensayo TRAPS confirmó que en SAF de alto riesgo la warfarina (AVK) es superior a rivaroxabán."
+                                )
+                            }
+                            if (youngCadasil) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Marcadores de CADASIL",
+                                    detail = "RM cerebral: leucoencefalopatía bilateral con señal T2/FLAIR hiperintensa con afectación característica de los lóbulos temporales anteriores (sensibilidad ~89%) y la cápsula externa. Confirmación genética mediante secuenciación de los 23 exones de NOTCH3."
+                                )
+                            }
+                            if (youngFabry) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Despiste de Fabry",
+                                    detail = "Dosificación de actividad de la enzima α-galactosidasa A en leucocitos (en hombres) o secuenciación genética del gen GLA (en mujeres). Buscar leucoencefalopatía, insuficiencia renal, dolor neuropático o angioqueratomas."
+                                )
+                            }
+                            if (youngHomocysteine) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Homocisteína en ayunas",
+                                    detail = "Buscar niveles plasmáticos elevados (> 15 µmol/L). Correlacionar con presencia de ectopia lentis, hábito marfanoide u osteoporosis."
+                                )
+                            }
+                            if (youngMelas) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Estudio para MELAS",
+                                    detail = "Dosificación de lactato sérico y en LCR, y estudio de ADN mitocondrial (mutación m.3243A>G). Clínicamente cursa con episodios \"ACV-like\" que no respetan territorios arteriales, miopatía, sordera y diabetes."
+                                )
+                            }
+                            if (youngVasculitis) {
+                                hasAnySuspect = true
+                                DetailBox(
+                                    title = "Despiste de Vasculitis Primaria del SNC",
+                                    detail = "Punción lumbar (pleocitosis linfocítica leve y proteínas elevadas en LCR), Angio-RM/Arteriografía cerebral (patrón de cuentas en vasos medianos) o biopsia dirigida leptomeníngea (patrón de oro)."
+                                )
+                            }
+
+                            if (!hasAnySuspect) {
+                                Text(
+                                    text = "Active las casillas de sospecha para revelar el protocolo de estudio molecular y de imagen específico.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontStyle = FontStyle.Italic
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "ACV en Embarazo y Puerperio",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    BulletPoint("Trombosis Venosa Cerebral (TVC)", "Frecuente en las primeras 4 semanas del puerperio. Signo del \"triángulo denso\" en TC. Diagnóstico con Angio-RM venosa. Tratamiento de elección: Heparina plena (HBPM o HNF), incluso si hay transformación hemorrágica activa.")
+                    BulletPoint("Síndrome PRES & Eclampsia", "Edema vasogénico parieto-occipital subcortical reversible visible en T2/FLAIR sin restricción en difusión. Tratamiento prioritario: sulfato de magnesio, control agresivo de la HTA y resolución inmediata del parto.")
+                }
+            }
+
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "ACV y Cáncer Activo (S. de Trousseau)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    BulletPoint("Endocarditis Marántica (ETNB)", "Vegetaciones estériles planas sobre la cara auricular de la válvula mitral o ventricular aórtica. Diagnóstico confirmatorio mediante Ecocardiograma Transesofágico (ETE). Tratamiento: heparina plena o HBPM.")
+                    BulletPoint("Síndrome de Trousseau", "Trombosis arteriales o venosas recurrentes o migratorias secundarias a adenocarcinomas mucosecretores ocultos (páncreas, pulmón, digestivo) con elevación masiva de dímero-D. Requiere anticoagulación con HBPM; los DOACs han mostrado menor tasa de eficacia.")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TabCalculadorasClinicas(onCopyClicked: (String, String, String) -> Unit) {
+    var ropeAge by remember { mutableStateOf(35f) }
+    var ropeHta by remember { mutableStateOf(true) }
+    var ropeDm by remember { mutableStateOf(true) }
+    var ropePrior by remember { mutableStateOf(true) }
+    var ropeSmoker by remember { mutableStateOf(true) }
+    var ropeCortical by remember { mutableStateOf(true) }
+
+    var bostonAge50 by remember { mutableStateOf(true) }
+    var bostonLobarHems by remember { mutableStateOf("Múltiples (≥ 2 lesiones lobares)") }
+    var bostonCss by remember { mutableStateOf("Multifocal (Bilateral o múltiples surcos)") }
+    var bostonEpvs by remember { mutableStateOf(true) }
+    var bostonLwh by remember { mutableStateOf(true) }
+
+    var elanNihss by remember { mutableStateOf(8f) }
+    var elanHems by remember { mutableStateOf(false) }
+    var elanHighRisk by remember { mutableStateOf(false) }
+
+    val ropeScore = getRopeScore(ropeAge.toInt(), ropeHta, ropeDm, ropePrior, ropeSmoker, ropeCortical)
+    val ropeIterp = getRopeInterpretation(ropeScore)
+
+    val bostonResult = getBostonResult(
+        bostonAge50,
+        if (bostonLobarHems.contains("Múltiples")) "multiple" else if (bostonLobarHems.contains("Única")) "single" else "none",
+        if (bostonCss.contains("Multifocal")) "multifocal" else if (bostonCss.contains("Focal")) "focal" else "none",
+        bostonEpvs,
+        bostonLwh
+    )
+
+    val elanInterpret = getElanTiming(elanNihss.toInt(), elanHems, elanHighRisk)
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // CARD 1: RoPE SCORE
+            Card(
+                modifier = Modifier.weight(1f).height(590.dp).testTag("calc_rope_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(14.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Calculate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Calculadora Score RoPE (PFO)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        
+                        Text(
+                            "Estratifica la probabilidad de que un Foramen Oval Permeable (FOP) sea la causa del evento en un paciente con un ACV criptogénico previo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 13.sp
+                        )
+
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Edad Actual del Paciente:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text("${ropeAge.toInt()} años", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = ropeAge,
+                                onValueChange = { ropeAge = it },
+                                valueRange = 18f..85f,
+                                modifier = Modifier.testTag("rope_age_slider")
+                            )
+                            val ropeAgePoints = if (ropeAge < 30) 5 else if (ropeAge < 40) 4 else if (ropeAge < 50) 3 else if (ropeAge < 60) 2 else if (ropeAge < 70) 1 else 0
+                            Text("Puntaje según edad: +$ropeAgePoints", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        val cbData = listOf(
+                            "hta" to ("Ausencia de Hipertensión Arterial (+1 pt)" to ropeHta),
+                            "dm" to ("Ausencia de Diabetes Mellitus (+1 pt)" to ropeDm),
+                            "prior" to ("Sin ACV o AIT previo (+1 pt)" to ropePrior),
+                            "smoker" to ("No fumador activo (+1 pt)" to ropeSmoker),
+                            "cortical" to ("Infarto cortical visible en neuroimagen (+1 pt)" to ropeCortical)
+                        )
+
+                        cbData.forEach { (id, pair) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        when (id) {
+                                            "hta" -> ropeHta = !ropeHta
+                                            "dm" -> ropeDm = !ropeDm
+                                            "prior" -> ropePrior = !ropePrior
+                                            "smoker" -> ropeSmoker = !ropeSmoker
+                                            "cortical" -> ropeCortical = !ropeCortical
+                                        }
+                                    }
+                                    .padding(vertical = 2.dp)
+                            ) {
+                                Checkbox(
+                                    checked = pair.second,
+                                    onCheckedChange = { checked ->
+                                        when (id) {
+                                            "hta" -> ropeHta = checked
+                                            "dm" -> ropeDm = checked
+                                            "prior" -> ropePrior = checked
+                                            "smoker" -> ropeSmoker = checked
+                                            "cortical" -> ropeCortical = checked
+                                        }
+                                    },
+                                    modifier = Modifier.size(30.dp).testTag("rope_cb_$id")
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(pair.first, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Puntaje RoPE Total", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text("$ropeScore / 10", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Atribución: ${ropeIterp.first}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Fracción: ${ropeIterp.second}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = ropeIterp.third,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 12.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // CARD 2: BOSTON V2.0
+            Card(
+                modifier = Modifier.weight(1f).height(590.dp).testTag("calc_boston_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(14.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Calculate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Boston v2.0 (AAC Analyzer)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Text(
+                            "Evalúe la probabilidad clínica de Angiopatía Amiloide Cerebral utilizando el estándar diagnóstico internacional de Boston v2.0.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 13.sp
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { bostonAge50 = !bostonAge50 }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = bostonAge50,
+                                onCheckedChange = { bostonAge50 = it },
+                                modifier = Modifier.size(30.dp).testTag("boston_cb_age50")
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Edad del paciente es ≥ 50 años", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+
+                        CustomDropdownSelector(
+                            label = "Hemorragias Lobares Estrictas (Macro o Micro)",
+                            options = listOf(
+                                "Múltiples (≥ 2 lesiones lobares)",
+                                "Única (1 lesión lobar)",
+                                "Ninguna lesión lobar"
+                            ),
+                            selectedOption = bostonLobarHems,
+                            onOptionSelected = { bostonLobarHems = it }
+                        )
+
+                        CustomDropdownSelector(
+                            label = "Siderosis Cortical Superficial (cSS)",
+                            options = listOf(
+                                "Multifocal (Bilateral o múltiples surcos)",
+                                "Focal (Restringida a un único surco)",
+                                "Ausencia de siderosis"
+                            ),
+                            selectedOption = bostonCss,
+                            onOptionSelected = { bostonCss = it }
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { bostonEpvs = !bostonEpvs }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = bostonEpvs,
+                                onCheckedChange = { bostonEpvs = it },
+                                modifier = Modifier.size(30.dp).testTag("boston_cb_epvs")
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("ePVS Centrum Semiovale ≥10 bilateral (v2.0)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { bostonLwh = !bostonLwh }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = bostonLwh,
+                                onCheckedChange = { bostonLwh = it },
+                                modifier = Modifier.size(30.dp).testTag("boston_cb_lwh")
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Leucoencefalopatía posterior temporo-occipital", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    val resultBg = if (bostonResult.first.contains("Probable")) {
+                        Color(0xFFE6F2F4)
+                    } else if (bostonResult.first.contains("Posible")) {
+                        Color(0xFFFEF3C7)
+                    } else {
+                        Color(0xFFF1F5F9)
+                    }
+                    val resultBorder = if (bostonResult.first.contains("Probable")) {
+                        Color(0xFF006074)
+                    } else if (bostonResult.first.contains("Posible")) {
+                        Color(0xFFF59E0B)
+                    } else {
+                        Color(0xFFCBD5E1)
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = resultBg),
+                        border = BorderStroke(1.dp, resultBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("DIAGNÓSTICO SEGÚN CRITERIOS BOSTON V2.0", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF64748B))
+                            Text(bostonResult.first, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = bostonResult.third)
+                            Text(
+                                text = bostonResult.second,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // CARD 3: TIMING DOAC
+            Card(
+                modifier = Modifier.weight(1f).height(590.dp).testTag("calc_elan_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(14.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Calculate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Calculador Timing DOAC (ELAN)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Text(
+                            "Aplica los datos derivados del ensayo ELAN (NEJM 2023) para determinar el día de inicio seguro de los DOACs.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 13.sp
+                        )
+
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Déficit Neurológico Actual (Puntaje NIHSS):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text("${elanNihss.toInt()}", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = elanNihss,
+                                onValueChange = { elanNihss = it },
+                                valueRange = 0f..30f,
+                                modifier = Modifier.testTag("elan_nihss_slider")
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Leve (0-5)", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Moderado (6-15)", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Extenso (≥16)", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { elanHems = !elanHems }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = elanHems,
+                                onCheckedChange = { elanHems = it },
+                                modifier = Modifier.size(30.dp).testTag("elan_cb_hems")
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Transformación hemorrágica sintomática o asintomática", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { elanHighRisk = !elanHighRisk }
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Checkbox(
+                                checked = elanHighRisk,
+                                onCheckedChange = { elanHighRisk = it },
+                                modifier = Modifier.size(30.dp).testTag("elan_cb_high_risk")
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Factores de alto riesgo de recurrencia isquémica", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE6F2F4)),
+                        border = BorderStroke(1.dp, Color(0xFF006074).copy(alpha = 0.4f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("TIMING ÓPTIMO RECOMENDADO", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF006074))
+                            Text(elanInterpret.second, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFF006074))
+                            Text(elanInterpret.first, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                            Text(
+                                text = elanInterpret.third,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // DARK EXECUTIVE ACV SAFETY CARD
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("ictus_safety_container"),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color(0xFF1E293B)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(18.dp)
+                            .background(Color(0xFF0D9488), RoundedCornerShape(2.dp))
+                    )
+                    Text(
+                        text = "Resumen de Parámetros Clínicos de Seguridad en Unidad de Ictus",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val safetyItems = listOf(
+                        Pair("Manejo de Presión Arterial", "Fase aguda (sin lisis): Mantener permisivo < 220/120 mmHg.\nFase aguda (con lisis): Mantener estrictamente < 185/110 mmHg antes y < 180/105 mmHg durante 24h."),
+                        Pair("Metas de Glucosa y Temp", "Glucemia: Rango objetivo 140-180 mg/dL mediante infusión de insulina.\nTemperatura: Tratar de forma agresiva >37.5 °C con paracetamol."),
+                        Pair("Crisis Epilépticas Post-ACV", "No se recomienda la profilaxis sistemática. Las crisis agudas se tratan con benzodiacepinas. Para epilepsia post-ACV, preferir levetiracetam, lacosamida o lamotrigina."),
+                        Pair("Manejo de HIC", "Cabecera a 30°, osmotherapy secuencial (manitol o SSH 3%), hiperventilación de rescate como puente a la hemicraniectomía descompresiva si es infarto maligno de ACM.")
+                    )
+
+                    safetyItems.forEach { (title, description) ->
+                        Card(
+                            modifier = Modifier.weight(1f).height(172.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            border = BorderStroke(1.dp, Color(0xFF334155))
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = title,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF0D9488)
+                                )
+                                Text(
+                                    text = description,
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFE2E8F0),
+                                    lineHeight = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CustomDropdownSelector(
+    label: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column {
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(selectedOption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        if (expanded) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column {
+                    options.forEach { option ->
+                        Text(
+                            text = option,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onOptionSelected(option)
+                                    expanded = false
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            color = if (option == selectedOption) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (option == selectedOption) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Global math helper algorithms
+fun getRopeScore(age: Int, hta: Boolean, dm: Boolean, prior: Boolean, smoker: Boolean, cortical: Boolean): Int {
+    var score = 0
+    if (hta) score += 1
+    if (dm) score += 1
+    if (prior) score += 1
+    if (smoker) score += 1
+    if (cortical) score += 1
+    if (age in 18..29) score += 5
+    else if (age in 30..39) score += 4
+    else if (age in 40..49) score += 3
+    else if (age in 50..59) score += 2
+    else if (age in 60..69) score += 1
+    return score
+}
+
+fun getRopeInterpretation(score: Int): Triple<String, String, String> {
+    return when (score) {
+        0, 1, 2 -> Triple("0%", "0%", "FOP incidental. No recomendado cerrar.")
+        3 -> Triple("25%", "0%", "FOP incidental. Buscar causas alternativas.")
+        4 -> Triple("38%", "0%", "Baja porbabilidad de FOP causal. Optimizar factores vasculares.")
+        5 -> Triple("34%", "34%", "Probabilidad causal limítrofe. Evaluar anatomía del septo.")
+        6 -> Triple("47%", "62%", "Probabilidad moderada. Considerar si hay cortocircuito de gran tamaño.")
+        7 -> Triple("54%", "72%", "Alta probabilidad causal. Indicado el cierre si edad < 60 años.")
+        8 -> Triple("67%", "84%", "FOP altamente plausible. Cierre recomendado si no hay otra etiología.")
+        9 -> Triple("83%", "88%", "Causalidad de FOP excelente. Cierre de primera línea en jóvenes (NNT ~20).")
+        10 -> Triple("97%", "88%", "Causalidad del 97%. Cierre altamente beneficioso (EACs CLOSE/REDUCE).")
+        else -> Triple("N/A", "N/A", "N/A")
+    }
+}
+
+fun getBostonResult(age50: Boolean, lobar: String, css: String, epvs: Boolean, lwh: Boolean): Triple<String, String, Color> {
+    if (!age50) return Triple("Excluido", "La edad de presentación debe ser ≥ 50 años.", Color.Gray)
+    val strictlyLobarHems = lobar == "multiple"
+    val singleLobarHem = lobar == "single"
+    val cssMultifocal = css == "multifocal"
+    val cssFocal = css == "focal"
+    val hasPvsOrLwh = epvs || lwh
+
+    if (strictlyLobarHems || cssMultifocal) {
+        return Triple(
+            "AAC Probable (Boston v2.0)",
+            "Cumple criterios para AAC Probable. Tasa de recurrencia hemorrágica elevada (~10% anual). Contraindicado el reinicio de anticoagulantes para FA concomitante.",
+            Color(0xFF006074)
+        )
+    }
+    if (singleLobarHem && (cssFocal || hasPvsOrLwh)) {
+        return Triple(
+            "AAC Posible (Boston v2.0)",
+            "Cumple criterios para AAC Posible por coexistencia de una hemorragia lobar estricta y marcadores no hemorrágicos (ePVS centrum semiovale o leucoencefalopatía posterior).",
+            Color(0xFFB45309)
+        )
+    }
+    return Triple(
+        "No clasifica para AAC",
+        "No cumple criterios diagnósticos de Boston v2.0. Investigar microangiopatía hipertensiva profunda.",
+        Color(0xFF64748B)
+    )
+}
+
+fun getElanTiming(nihss: Int, hems: Boolean, highRisk: Boolean): Triple<String, String, String> {
+    if (hems) {
+        return Triple(
+            "ACV con Transformación Hemorrágica",
+            "Diferir de 7 a 14 días o más",
+            "El consenso internacional de subespecialidad sugiere suspender estrictamente los DOACs y repetir neuroimagen en 7-14 días previa reevaluación."
+        )
+    }
+    return if (nihss <= 5) {
+        Triple(
+            "ACV Isquémico Menor (NIHSS <= 5)",
+            "Fase Temprana: < 48 - 72 horas",
+            "La evidencia del ensayo ELAN (NEJM 2023) apoya el inicio hiperprecoz seguro, reduciendo recurrencias sin elevar la tasa de sangrado sintomático."
+        )
+    } else if (nihss in 6..15) {
+        val timing = if (highRisk) "Temprano: Día 3 - 4" else "Día 4 - 6"
+        Triple(
+            "ACV Isquémico Moderado (NIHSS 6-15)",
+            timing,
+            "Fase intermedia de inicio. Se puede acelerar a las 72-96h si existe un trombo visible en aurícula o un riesgo embólico extremo documentado."
+        )
+    } else {
+        Triple(
+            "ACV Isquémico Mayor (NIHSS >= 16)",
+            "Días 12 - 14",
+            "Requiere obligatoriamente un control por TC o RM para excluir de forma categórica la transformación hemorrágica extensa antes del inicio de DOACs."
+        )
+    }
+}
+
+@Composable
+fun TrialComparisonCard(
+    title: String,
+    population: String,
+    criteria: String,
+    intervention: String,
+    implication: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        ),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.MenuBook,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "Población y Criterios Directos",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(
+                    text = "$population • $criteria",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "Intervención Evaluada",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color(0xFFD97706)
+                )
+                Text(
+                    text = intervention,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Implicación para Práctica Clínica",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = implication,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BulletPoint(label: String, desc: String) {
+    Row(modifier = Modifier.padding(vertical = 3.dp)) {
+        Text("• ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Column {
+            Text(text = label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 13.sp)
+        }
+    }
+}
+
+@Composable
+fun DetailBox(title: String, detail: String) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 13.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    }
+}
+
+@Composable
+fun EtiologiaAcvScreen(onCopyClicked: (String, String, String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.22f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "CLASIFICACIÓN ETIOLÓGICA & FENOTIPOS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Diferenciación de Sistemas Clínicos",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Para protocolizar el estudio y tratamiento preventivo secundario del ictus, es crucial entender que TOAST, ASCOD, CCS y Plaque-RADS son metodologías complementarias pero independientes:\n\n• TOAST: Clasificación categórica de la causa proximal más probable del infarto (5 subtipos rígidos).\n• ASCOD: Fenotipificación sistemática de la severidad (grados 0-3) de toda enfermedad subyacente de forma simultánea.\n• Algoritmo CCS: Sistema informatizado basado en flujos lógicos para estandarizar la etiología.\n• Plaque-RADS: Escala detallada de la microestructura y vulnerabilidad de la placa carotídea mediante angiotomografía.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+        
+        TabFisiopatologiaTOAST(onCopyClicked = onCopyClicked)
+    }
+}
+
 
 

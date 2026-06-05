@@ -25,22 +25,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SavedCalculation
+import com.example.data.UserFavorite
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun TabInicio(
+    darkTheme: Boolean = false,
     onNavigateToTab: (Int) -> Unit,
     onNavigateToDrug: (String) -> Unit,
     savedCalculations: List<SavedCalculation>,
     onClearCalculations: () -> Unit,
-    onCopyCalculation: (SavedCalculation) -> Unit
+    onCopyCalculation: (SavedCalculation) -> Unit,
+    favorites: List<UserFavorite> = emptyList(),
+    onToggleFavorite: (String, String, String) -> Unit = { _, _, _ -> },
+    onNavigateToCalculator: (String) -> Unit = {},
+    onNavigateToCriterio: (String) -> Unit = {}
 ) {
     var showManualDialog by remember { mutableStateOf(false) }
 
@@ -66,7 +75,10 @@ fun TabInicio(
     )
 
     if (showManualDialog) {
-        AppManualDialog(onDismiss = { showManualDialog = false })
+        AppManualDialog(
+            onDismiss = { showManualDialog = false },
+            onNavigateToTab = onNavigateToTab
+        )
     }
 
     LazyColumn(
@@ -77,59 +89,70 @@ fun TabInicio(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
     ) {
-        // 1. WORKSTATION SUB-HEADER STATUS BAR (TEAL ALIVE MONITOR AND STATE PILLS)
+        // 1. SYSTEM STATUS SUB-HEADER (COMPACT & OVERLAP-SAFE)
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             ) {
-                // Digital active heartbeat status
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .graphicsLayer(alpha = telemetryPulse)
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary) // Mint green active dot
-                    )
-                    Text(
-                        text = "ESTACIÓN BEDSIDE CRÍTICA • ONLINE",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            letterSpacing = 1.2.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                        )
-                    )
-                }
-
-                // Data Count pill
-                Surface(
-                    shape = RoundedCornerShape(100.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudQueue,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer { alpha = telemetryPulse }
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondary)
                         )
                         Text(
-                            text = "${savedCalculations.size} Registros",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = MaterialTheme.colorScheme.primary
+                            text = "SISTEMA ACTIVO",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                letterSpacing = 1.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudQueue,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "${savedCalculations.size} Registros",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -143,10 +166,17 @@ fun TabInicio(
                     .clip(RoundedCornerShape(20.dp))
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
-                            )
+                            colors = if (darkTheme) {
+                                listOf(
+                                    Color(0xFF261847), // Deep dynamic clinic violet-indigo
+                                    Color(0xFF130A24)  // Midnight dark plum
+                                )
+                            } else {
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+                                )
+                            }
                         )
                     )
                     .testTag("home_hero_banner")
@@ -165,27 +195,36 @@ fun TabInicio(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color.White.copy(alpha = 0.2f),
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.MedicalServices,
-                                        contentDescription = "Servicio Médico",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
                             Column {
                                 Text(
-                                    text = "SYNAPPSE PLATFORM",
+                                    text = buildAnnotatedString {
+                                        withStyle(
+                                            SpanStyle(
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                        ) {
+                                            append("Syn")
+                                        }
+                                        withStyle(
+                                            SpanStyle(
+                                                fontWeight = FontWeight.Normal,
+                                                color = Color(0xFF2DD4BF) // Bright teal/cyan for neon highlight
+                                            )
+                                        ) {
+                                            append("App")
+                                        }
+                                        withStyle(
+                                            SpanStyle(
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                        ) {
+                                            append("Se")
+                                        }
+                                    },
                                     style = MaterialTheme.typography.labelMedium.copy(
-                                        letterSpacing = 2.sp,
-                                        color = Color.White.copy(alpha = 0.75f),
-                                        fontWeight = FontWeight.ExtraBold
+                                        letterSpacing = 1.sp
                                     )
                                 )
                                 Text(
@@ -214,167 +253,71 @@ fun TabInicio(
                     }
 
                     Text(
-                        text = "Calculadoras de escala calibradas, criterios diagnósticos interactivos, compendio farmacológico y guías bedside de alta fidelidad.",
+                        text = "Calculadoras de escala calibradas, protocolos clínicos interactivos, compendio farmacológico y guías bedside de alta fidelidad.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color.White.copy(alpha = 0.9f),
                             lineHeight = 15.sp
                         )
                     )
-
-                    // Counters Grid of clinical assets
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        listOf(
-                            Triple("8", "Cálculos", Icons.Default.Calculate),
-                            Triple("7", "Criterios", Icons.Default.FactCheck),
-                            Triple("23", "Fármacos", Icons.Default.Medication),
-                            Triple("7", "Guías UCI", Icons.Default.Bolt)
-                        ).forEach { (count, label, icon) ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier
-                                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 6.dp, vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(10.dp)
-                                )
-                                Text(
-                                    text = "$count $label",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
 
-        // 2.5. INTERACTIVE MANUAL CTA CARD FOR GUEST/ONBOARDING
-        item {
-            Card(
-                onClick = { showManualDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("shortcut_manual_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.28f)
-                ),
-                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-                        modifier = Modifier.size(42.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Manual de la Aplicación",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Manual de Capacidades Clínicas",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                        Text(
-                            text = "Presiona aquí para explorar el compendio de herramientas, criterios indexados, guías clínicas e índices avanzados para cuidados bedside.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "Abrir Manual",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
 
-        // 3. SECCIONES PRINCIPALES SECTION HEADER & SHORTCUTS GRID
+
+        // 3. SECCIONES PRINCIPALES
         item {
             Text(
-                text = "Secciones Principales",
+                text = "Secciones de Trabajo Bedside",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
 
         item {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    HomeShortcutCard(
-                        title = "Calculadoras",
-                        description = "NIHSS, ALSFRS-R, QMG, ASPECTS, ICH, FOUR, EDSS.",
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        icon = Icons.Default.Calculate,
-                        modifier = Modifier.weight(1f).testTag("shortcut_calc"),
-                        onClick = { onNavigateToTab(1) }
-                    )
-                    HomeShortcutCard(
-                        title = "Criterios",
-                        description = "Certificar Gold Coast, EULAR, TOAST e ILAE.",
-                        accentColor = Color(0xFF7C3AED), // Violet
-                        icon = Icons.Default.FactCheck,
-                        modifier = Modifier.weight(1f).testTag("shortcut_crit"),
-                        onClick = { onNavigateToTab(2) }
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    HomeShortcutCard(
-                        title = "Farmacología",
-                        description = "Directorio de dosis, interacciones y toxicidad.",
-                        accentColor = Color(0xFF0F766E), // Teal
-                        icon = Icons.Default.Medication,
-                        modifier = Modifier.weight(1f).testTag("shortcut_drugs"),
-                        onClick = { onNavigateToTab(3) }
-                    )
-                    HomeShortcutCard(
-                        title = "Exploración",
-                        description = "Dermatomas, reflejos, mRS, FAST y MGFA.",
-                        accentColor = Color(0xFFD97706), // Amber
-                        icon = Icons.Default.AccessibilityNew,
-                        modifier = Modifier.weight(1f).testTag("shortcut_quick"),
-                        onClick = { onNavigateToTab(4) }
-                    )
-                }
+                HomeShortcutRowCard(
+                    title = "Calculadoras de Escalas",
+                    description = "Evaluación cuantitativa calibrada con interpretador inmediato integrado.",
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    icon = Icons.Default.Calculate,
+                    tags = listOf("NIHSS", "FOUR", "ASPECTS", "ICH Volumétrica", "EDSS", "ALSFRS-R"),
+                    modifier = Modifier.testTag("shortcut_calc"),
+                    onClick = { onNavigateToTab(1) }
+                )
+
+                HomeShortcutRowCard(
+                    title = "Protocolos & Consenso",
+                    description = "Criterios diagnósticos, clasificaciones de ACV y guías de certificación.",
+                    accentColor = Color(0xFF7C3AED), // Violet
+                    icon = Icons.Default.FactCheck,
+                    tags = listOf("Gold Coast", "EULAR/ACR", "TOAST", "ILAE 2014"),
+                    modifier = Modifier.testTag("shortcut_crit"),
+                    onClick = { onNavigateToTab(2) }
+                )
+
+                HomeShortcutRowCard(
+                    title = "Farmacología Bedside",
+                    description = "Calculadora de infusión, por peso, esquemas renales y prevención SNC.",
+                    accentColor = Color(0xFF0F766E), // Teal
+                    icon = Icons.Default.Medication,
+                    tags = listOf("Dosis Críticas", "Fibrinolíticos", "Cockcroft-Gault", "Ajuste BHE"),
+                    modifier = Modifier.testTag("shortcut_drugs"),
+                    onClick = { onNavigateToTab(3) }
+                )
+
+                HomeShortcutRowCard(
+                    title = "Exploración & Guías UCI",
+                    description = "Pruebas segmentarias de sensibilidad, reflejos y guías neurocríticas rápidas.",
+                    accentColor = Color(0xFFD97706), // Amber
+                    icon = Icons.Default.AccessibilityNew,
+                    tags = listOf("Dermatomas", "Reflejos ROT", "mRS", "FAST", "Meningitis", "Drenaje LCR"),
+                    modifier = Modifier.testTag("shortcut_quick"),
+                    onClick = { onNavigateToTab(4) }
+                )
             }
         }
 
@@ -387,9 +330,9 @@ fun TabInicio(
                     .testTag("shortcut_protocols_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = criticalGuidePulse * 0.4f)
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.12f)
                 ),
-                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.error.copy(alpha = criticalGuidePulse + 0.15f))
+                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f))
             ) {
                 Row(
                     modifier = Modifier
@@ -428,7 +371,8 @@ fun TabInicio(
                             )
                             Box(
                                 modifier = Modifier
-                                    .size(4.dp)
+                                    .graphicsLayer { alpha = criticalGuidePulse } // Smooth animation on the drawing layer -> 0% recompositions
+                                    .size(6.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.error)
                             )
@@ -446,7 +390,7 @@ fun TabInicio(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Acesso inmediato a Código ACV, Muerte Encefálica legal, Meningitis, HINTS+ y Vasoactivos.",
+                            text = "Acceso inmediato a Código ACV, Muerte Encefálica legal, Meningitis, HINTS+ y Vasoactivos.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 14.sp
@@ -576,6 +520,143 @@ fun TabInicio(
             }
         }
 
+        // 5.5 MIS FAVORITOS BEDSIDE
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Favoritos Bedside",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+
+        if (favorites.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("empty_favorites_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.StarBorder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Text(
+                            text = "Acceso Rápido Personalizado",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Pulsa el ícono de estrella (⭐) en la parte superior derecha de cualquier calculadora o protocolo para tener acceso inmediato desde aquí.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    favorites.forEach { fav ->
+                        val themeColor = if (fav.type == "calculator") MaterialTheme.colorScheme.primary else Color(0xFF7C3AED)
+                        val iconVector = if (fav.type == "calculator") Icons.Default.Calculate else Icons.Default.FactCheck
+                        
+                        Card(
+                            onClick = {
+                                if (fav.type == "calculator") {
+                                    onNavigateToCalculator(fav.featureId)
+                                } else {
+                                    onNavigateToCriterio(fav.featureId)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("favorite_item_${fav.featureId}"),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = themeColor.copy(alpha = 0.1f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = iconVector,
+                                            contentDescription = null,
+                                            tint = themeColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.width(12.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = fav.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (fav.type == "calculator") "Calculadora Médica" else "Protocolo y Criterios",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                
+                                IconButton(
+                                    onClick = { onToggleFavorite(fav.featureId, fav.name, fav.type) },
+                                    modifier = Modifier.size(32.dp).testTag("delete_favorite_${fav.featureId}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = "Quitar favorito",
+                                        tint = Color(0xFFFFD700),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 6. HISTORIAL DE CÁLCULO BED-SIDE
         item {
             Row(
@@ -659,7 +740,7 @@ fun TabInicio(
         } else {
             items(savedCalculations) { calculation ->
                 val calcThemeColor = when {
-                    calculation.scaleId.contains("criterios") -> Color(0xFF7C3AED) // Violet
+                    calculation.scaleId.contains("criterios") || calculation.scaleId.contains("protocolos") -> Color(0xFF7C3AED) // Violet
                     calculation.scaleId.contains("farmaco") -> Color(0xFF0F766E) // Teal
                     calculation.scaleId.contains("nihss") -> Color(0xFFDC2626) // Red
                     calculation.scaleId.contains("four") -> Color(0xFF2563EB) // Blue
@@ -704,7 +785,7 @@ fun TabInicio(
                                 ) {
                                     Icon(
                                         imageVector = when {
-                                            calculation.scaleId.contains("criterios") -> Icons.Default.FactCheck
+                                            calculation.scaleId.contains("criterios") || calculation.scaleId.contains("protocolos") -> Icons.Default.FactCheck
                                             calculation.scaleId.contains("farmaco") -> Icons.Default.Medication
                                             else -> Icons.Default.Calculate
                                         },
@@ -768,65 +849,89 @@ fun TabInicio(
 }
 
 @Composable
-fun HomeShortcutCard(
+fun HomeShortcutRowCard(
     title: String,
     description: String,
     accentColor: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tags: List<String>,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(138.dp),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
         ),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = accentColor.copy(alpha = 0.12f),
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(46.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = accentColor,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                    ),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
                 )
+                if (tags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        tags.forEach { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = accentColor.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.15f))
+                            ) {
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                    color = accentColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -841,8 +946,90 @@ private fun formatTimestamp(timestamp: Long): String {
     }
 }
 
+data class ManualItemData(
+    val name: String,
+    val description: String,
+    val targetTab: Int,
+    val tag: String
+)
+
+data class ManualCategoryData(
+    val title: String,
+    val items: List<ManualItemData>
+)
+
+val manualData = listOf(
+    ManualCategoryData(
+        title = "🔬 1. CALCULADORAS CLÍNICAS",
+        items = listOf(
+            ManualItemData("NIHSS", "Puntuación de déficit de 0 a 42 puntos en eventos coronarios/ACV.", 1, "Cálculo"),
+            ManualItemData("FOUR Score", "Alternativa avanzada a GCS: ocular, motor, tallo y patrón respiratorio.", 1, "Cálculo"),
+            ManualItemData("ASPECTS / PC-ASPECTS", "Mapeo topológico interactivo en TAC simple para arteria cerebral anterior y posterior.", 1, "Cálculo"),
+            ManualItemData("ICH Score / Volumetría", "Hemorragia intracerebral con cálculo (AxBxC)/2 para estimación de masa hemática.", 1, "Cálculo"),
+            ManualItemData("ALSFRS-R", "Escala calificada de Amyotrophic Lateral Sclerosis para progresión funcional.", 1, "Cálculo"),
+            ManualItemData("QMG", "Quantitative Myasthenia Gravis Score para fatiga muscular.", 1, "Cálculo"),
+            ManualItemData("Kurtzke EDSS", "Escala del estado de discapacidad de Esclerosis Múltiple mapeada por sistemas.", 1, "Cálculo")
+        )
+    ),
+    ManualCategoryData(
+        title = "📋 2. PROTOCOLOS & CRITERIOS DE CONSENSO",
+        items = listOf(
+            ManualItemData("Criterios Gold Coast", "Criterios simplificados para la certificación de Esclerosis Lateral Amiotrófica (ELA).", 2, "Protocolo"),
+            ManualItemData("Consenso EULAR/ACR", "Criterios de validación integrados para Miastenia Gravis.", 2, "Protocolo"),
+            ManualItemData("Etiología & Fenotipos (TOAST & ASCOD)", "Criterios etiológicos TOAST, fenotipificación interactiva ASCOD y escala de placa carotídea Plaque-RADS.", 4, "Exploración"),
+            ManualItemData("Criterios ILAE 2014", "Algoritmo de clasificación clínica de crisis epilépticas y epilepsia.", 2, "Protocolo")
+        )
+    ),
+    ManualCategoryData(
+        title = "💊 3. FARMACOLOGÍA & DOSIS BEDSIDE",
+        items = listOf(
+            ManualItemData("Dosificación Crítica", "Directorio inmediato de inotrópicos, anticomiciales, trombolíticos por peso y sedación.", 3, "Fármaco"),
+            ManualItemData("Depuración Renal", "Calculadora Cockcroft-Gault para tasas de filtrado clínico.", 3, "Fármaco"),
+            ManualItemData("Ajuste de Barrera BHE", "Dosificación modificatoria para medicamentos de SNC para prevenir neurotoxicidad.", 3, "Fármaco")
+        )
+    ),
+    ManualCategoryData(
+        title = "🧭 4. EXPLORACIÓN RÁPIDA BEDSIDE",
+        items = listOf(
+            ManualItemData("Dermatomas Interactivos", "Mapeo sensitivo táctil del paciente por niveles segmentarios corporales.", 4, "Exploración"),
+            ManualItemData("Reflejos ROT", "Guía segmentaria de exploración de reflejos osteotendinosos y su gradación.", 4, "Exploración"),
+            ManualItemData("Escalas de Screening", "Puntuaciones funcionales mRS (Rankin), escala FAST en urgencias y clasificación MGFA.", 4, "Exploración")
+        )
+    ),
+    ManualCategoryData(
+        title = "🦠 5. NEUROINFECTOLOGÍA UCI",
+        items = listOf(
+            ManualItemData("Triage Meningoencefalitis", "Diagnóstico interactivo de patógenos comunes y perfil citoquímico del LCR.", 4, "Neuroinfectología"),
+            ManualItemData("Índices de Diagnóstico", "Thwaites, Marais, BMS pediátrico y BM-CASCO en adultos para meningitis.", 4, "Neuroinfectología"),
+            ManualItemData("Presión de Apertura LCR", "Monitoreo seguro ante hipertensión endocraneana y punción de descarga.", 4, "Neuroinfectología"),
+            ManualItemData("Barrera BHE (QC-Alb/IgG)", "Cociente de Albúmina e Índice de IgG para síntesis intratecal activa.", 4, "Neuroinfectología")
+        )
+    )
+)
+
 @Composable
-fun AppManualDialog(onDismiss: () -> Unit) {
+fun AppManualDialog(
+    onDismiss: () -> Unit,
+    onNavigateToTab: (Int) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredCategories = remember(searchQuery) {
+        if (searchQuery.isBlank()) {
+            manualData
+        } else {
+            manualData.map { category ->
+                category.copy(
+                    items = category.items.filter { item ->
+                        item.name.contains(searchQuery, ignoreCase = true) ||
+                        item.description.contains(searchQuery, ignoreCase = true) ||
+                        item.tag.contains(searchQuery, ignoreCase = true)
+                    }
+                )
+            }.filter { it.items.isNotEmpty() }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -850,28 +1037,27 @@ fun AppManualDialog(onDismiss: () -> Unit) {
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth().testTag("close_manual_button")
             ) {
-                Text("Entendido • Volver al Trabajo")
+                Text("Cerrar Manual")
             }
         },
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.MenuBook,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(28.dp)
                 )
                 Column {
                     Text(
-                        text = "Manual de Operación",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "Capacidades Clínicas",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "Capacidades de SynAppSe",
+                        text = "Buscador general de herramientas y guías",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -879,95 +1065,114 @@ fun AppManualDialog(onDismiss: () -> Unit) {
             }
         },
         text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth().testTag("manual_search_field"),
+                    placeholder = { Text("Buscar capacidad clínica...", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpiar", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    ),
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+
+                Box(
                     modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = 340.dp)
                 ) {
-                    Text(
-                        text = "Bienvenido a SynAppSe. Esta guía interactiva le proporciona un compendio rápido de todas las capacidades clínicas disponibles en su estación de trabajo bedside.",
-                        style = MaterialTheme.typography.bodySmall,
-                        lineHeight = 16.sp
-                    )
-                    
-                    ManualFeatureSection(
-                        categoryTitle = "🔬 1. CALCULADORAS CLÍNICAS",
-                        features = listOf(
-                            "NIHSS" to "Puntuación de 0 a 42 puntos para determinar el déficit del paciente en eventos coronarios/ACV.",
-                            "ALSFRS-R (ELA)" to "Escala calificada de Amyotrophic Lateral Sclerosis para evaluar progresión funcional de la motoneurona.",
-                            "QMG" to "Quantitative Myasthenia Gravis Score para calificar severidad de fatiga muscular.",
-                            "ASPECTS & PC-ASPECTS" to "Mapeo topológico interactivo anterior y posterior en TAC simple para calcular extensión de infarto isquémico.",
-                            "FOUR Score" to "Alternativa avanzada a GCS, califica respuesta ocular, motora, de tallo y patrón respiratorio en pacientes intubados.",
-                            "Kurtzke EDSS" to "Escala del Estado de Discapacidad de Esclerosis Múltiple mapeada por sistemas funcionales.",
-                            "ICH Score" to "Calcula mortalidad por hemorragia intracerebral de 0 a 6 puntos, con estimación volumétrica integrada (AxBxC) / 2."
-                        )
-                    )
-
-                    ManualFeatureSection(
-                        categoryTitle = "📋 2. CRITERIOS DIAGNÓSTICOS",
-                        features = listOf(
-                            "Guías Gold Coast" to "Censo interactivo para certificar Esclerosis Lateral Amiotrófica (ELA).",
-                            "Consenso EULAR/ACR" to "Lista de validación combinada de criterios diagnósticos de Miastenia Gravis.",
-                            "Clasificación TOAST" to "Mapeo ágil de los 5 subtipos etiológicos de ACV isquémico.",
-                            "Criterios ILAE 2014" to "Algoritmo de clasificación clínica de crisis epilépticas y epilepsia."
-                        )
-                    )
-
-                    ManualFeatureSection(
-                        categoryTitle = "💊 3. FARMACORREGULACIÓN & DOSIS",
-                        features = listOf(
-                            "Dosificación Crítica" to "Compendio inmediato de Inotrópicos, Anticomiciales, Trombolíticos (Alteplasa/TNK por peso) y Sedoanalgesia.",
-                            "Ajuste Renal & SNC" to "Calculadora de depuración (Cockcroft-Gault) con esquemas preventivos de dosis ajustadas al SNC para medicamentos que cruzan la BHE (Aciclovir, Ceftriaxona, Ampicilina, Meropenem y Cefepima) para prevenir fallos renales o neurotoxicidad (encefalopatía por cefepima)."
-                        )
-                    )
-
-                    ManualFeatureSection(
-                        categoryTitle = "🧭 4. EXPLORACIÓN RÁPIDA BEDSIDE",
-                        features = listOf(
-                            "Dermatomas Interactivos" to "Mapeo sensitivo táctil del cuerpo por niveles segmentarios.",
-                            "Reflejos ROT" to "Guía de interpretación y escala clínica profunda de hiper/arreflexia (0 a 4+).",
-                            "Escalas de Screening" to "Puntuaciones mRS (Rankin), escala FAST (ACV rápido) y clasificación higiénica MGFA."
-                        )
-                    )
-
-                    ManualFeatureSection(
-                        categoryTitle = "🦠 5. NEUROINFECTOLOGÍA AVANZADA",
-                        features = listOf(
-                            "Triage de Meningoencefalitis" to "Predicción interactiva de patógenos comunes, análisis de laboratorio/bioquímica del LCR.",
-                            "Índices de Lab" to "Alineación de criterios diagnósticos de Thwaites y Marais (Meningitis Tuberculosa vs Bacteriana), BMS pediátrico y BM-CASCO en adultos.",
-                            "Presión Cripto & Drenaje" to "Evaluador de presión de apertura y volumen óptimo de PL de goteo terapéutico.",
-                            "Índices de Barrera BHE" to "Cálculo en paralelo de Cociente de Albúmina (Q-Alb) para probar permeabilidad de la Barrera Hematoencefálica e Índice de IgG para constatar la síntesis intratecal activa de anticuerpos (Esclerosis Múltiple, lúes o neuroinflamación crónica)."
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                RoundedCornerShape(8.dp)
+                    if (filteredCategories.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(44.dp)
                             )
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VerifiedUser,
-                            contentDescription = "Validado",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Calibrado de acuerdo con guías clínicas de la AHA/ASA, AAN y consensos internacionales vigentes (2026).",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                            Text(
+                                text = "Sin resultados para \"$searchQuery\"",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Intente otra palabra clave o explore las categorías.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            filteredCategories.forEach { category ->
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = category.title,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    category.items.forEach { item ->
+                                        InteractiveManualItemRow(
+                                            item = item,
+                                            onClick = {
+                                                onNavigateToTab(item.targetTab)
+                                                onDismiss()
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VerifiedUser,
+                                    contentDescription = "Validado",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "Calibrado de acuerdo con consensos médicos de la AHA, AAN y guías vigentes.",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -978,48 +1183,99 @@ fun AppManualDialog(onDismiss: () -> Unit) {
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp)
+            .padding(20.dp)
             .testTag("app_manual_dialog")
     )
 }
 
 @Composable
-fun ManualFeatureSection(categoryTitle: String, features: List<Pair<String, String>>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = categoryTitle,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-            )
+fun InteractiveManualItemRow(
+    item: ManualItemData,
+    onClick: () -> Unit
+) {
+    val accentColor = when (item.targetTab) {
+        1 -> MaterialTheme.colorScheme.primary
+        2 -> Color(0xFF7C3AED)
+        3 -> Color(0xFF0F766E)
+        else -> Color(0xFFD97706)
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("manual_item_launch_${item.name.lowercase().filter { it.isLetter() }}"),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(accentColor)
+            )
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                features.forEach { (name, desc) ->
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
-                            text = name,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
+                            text = item.name,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = desc,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 13.sp
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.1f),
+                            border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = item.tag,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                color = accentColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
-                    if (name != features.last().first) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = item.description,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 14.sp
+                    )
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = accentColor.copy(alpha = 0.08f),
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Launch,
+                            contentDescription = "Lanzar",
+                            tint = accentColor,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
